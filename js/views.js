@@ -99,7 +99,11 @@ function renderForm(mode, id = null) {
 
     let currentImageData = item.imageData || "";
 
-    uploadArea.onclick = () => fileInput.click();
+    uploadArea.addEventListener("click", (e) => {
+    e.preventDefault();      // stop double-trigger
+    fileInput.click();       // open gallery once
+    });
+
 
     fileInput.addEventListener("change", e => {
         const file = e.target.files[0];
