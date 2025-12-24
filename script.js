@@ -53,12 +53,12 @@ function renderCatalog() {
     const isPlaceholder = !item.image || item.image === PLACEHOLDER;
     const imageSrc = item.image || PLACEHOLDER;
 
-    card.innerHTML = `
-      <div class="card-image ${isPlaceholder ? "placeholder" : ""}">
-        <img src="${imageSrc}" />
-      </div>
-      <div class="card-inner"><h2>${item.title}</h2></div>
-    `;
+   card.innerHTML = `
+     <div class="card-image ${isPlaceholder ? "placeholder" : ""}">
+       <img src="${imageSrc}" />
+     </div>
+   `;
+
 
     card.onclick = () => openPreview(index);
     catalogUI.appendChild(card);
