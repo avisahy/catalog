@@ -1,16 +1,23 @@
-document.querySelectorAll(".card").forEach(card => {
-  card.addEventListener("mousemove", e => {
-    const rect = card.getBoundingClientRect();
-    const x = e.clientX - rect.left - rect.width / 2;
-    const y = e.clientY - rect.top - rect.height / 2;
+const carousel = document.getElementById("carousel");
+const items = carousel.children;
+const total = items.length;
 
-    const rotateX = (y / rect.height) * -20;
-    const rotateY = (x / rect.width) * 20;
+let angle = 0;
+const step = 360 / total;
 
-    card.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
-  });
+// Position items in a circle
+for (let i = 0; i < total; i++) {
+  const rotate = step * i;
+  items[i].style.transform = `rotateY(${rotate}deg) translateZ(300px)`;
+}
 
-  card.addEventListener("mouseleave", () => {
-    card.style.transform = "rotateX(0deg) rotateY(0deg)";
-  });
-});
+// Rotate carousel
+document.getElementById("next").onclick = () => {
+  angle -= step;
+  carousel.style.transform = `rotateY(${angle}deg)`;
+};
+
+document.getElementById("prev").onclick = () => {
+  angle += step;
+  carousel.style.transform = `rotateY(${angle}deg)`;
+};
