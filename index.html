@@ -40,7 +40,9 @@
     <div class="popup-content">
       <div class="preview-img-wrapper" id="previewWrapper">
         <img id="previewImage" class="popup-img" />
+        <div id="previewText" class="placeholder-text"></div>
       </div>
+
       <h2 id="previewTitle"></h2>
 
       <div class="popup-buttons">
@@ -62,9 +64,10 @@
       <!-- Hidden file input -->
       <input id="itemImage" type="file" accept="image/*" hidden />
 
-      <!-- Clickable + placeholder -->
+      <!-- Clickable placeholder -->
       <div class="preview-img-wrapper clickable" id="formPreviewWrapper">
         <img id="imagePreview" class="preview-square" />
+        <div id="formPreviewText" class="placeholder-text"></div>
       </div>
 
       <button id="removeImage" class="remove-img-btn hidden">Remove Image</button>
