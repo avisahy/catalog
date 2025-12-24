@@ -22,15 +22,17 @@ let items = loadItems();
 -------------------------- */
 const catalogUI = document.getElementById("catalogUI");
 const carouselUI = document.getElementById("carouselUI");
+const btnCatalog = document.getElementById("btnCatalog");
+const btnCarousel = document.getElementById("btnCarousel");
 
-document.getElementById("btnCatalog").onclick = () => {
+btnCatalog.onclick = () => {
   btnCatalog.classList.add("active");
   btnCarousel.classList.remove("active");
   catalogUI.classList.remove("hidden");
   carouselUI.classList.add("hidden");
 };
 
-document.getElementById("btnCarousel").onclick = () => {
+btnCarousel.onclick = () => {
   btnCarousel.classList.add("active");
   btnCatalog.classList.remove("active");
   carouselUI.classList.remove("hidden");
@@ -48,8 +50,13 @@ function renderCatalog() {
     card.className = "card";
     card.dataset.index = index;
 
+    const isPlaceholder = !item.image || item.image === PLACEHOLDER;
+    const imageSrc = item.image || PLACEHOLDER;
+
     card.innerHTML = `
-      <img src="${item.image || PLACEHOLDER}" />
+      <div class="card-image ${isPlaceholder ? "placeholder" : ""}">
+        <img src="${imageSrc}" />
+      </div>
       <div class="card-inner"><h2>${item.title}</h2></div>
     `;
 
@@ -66,6 +73,7 @@ renderCatalog();
 const popup = document.getElementById("previewPopup");
 const previewTitle = document.getElementById("previewTitle");
 const previewImage = document.getElementById("previewImage");
+const previewWrapper = document.getElementById("previewWrapper");
 
 let selectedIndex = null;
 
@@ -73,8 +81,17 @@ function openPreview(index) {
   selectedIndex = index;
   const item = items[index];
 
+  const imageSrc = item.image || PLACEHOLDER;
+  const isPlaceholder = imageSrc === PLACEHOLDER;
+
   previewTitle.textContent = item.title;
-  previewImage.src = item.image || PLACEHOLDER;
+  previewImage.src = imageSrc;
+
+  if (isPlaceholder) {
+    previewWrapper.classList.add("placeholder");
+  } else {
+    previewWrapper.classList.remove("placeholder");
+  }
 
   popup.classList.remove("hidden");
 }
@@ -106,6 +123,7 @@ const itemName = document.getElementById("itemName");
 const itemImage = document.getElementById("itemImage");
 const imagePreview = document.getElementById("imagePreview");
 const removeImageBtn = document.getElementById("removeImage");
+const formPreviewWrapper = document.getElementById("formPreviewWrapper");
 
 let formMode = "add";
 
@@ -118,15 +136,24 @@ function openForm(mode) {
     formTitle.textContent = "Add Item";
     itemName.value = "";
     imagePreview.src = PLACEHOLDER;
-    imagePreview.classList.remove("hidden");
+    formPreviewWrapper.classList.add("placeholder");
     removeImageBtn.classList.add("hidden");
   } else {
     formTitle.textContent = "Edit Item";
     const item = items[selectedIndex];
+    const imageSrc = item.image || PLACEHOLDER;
+    const isPlaceholder = imageSrc === PLACEHOLDER;
+
     itemName.value = item.title;
-    imagePreview.src = item.image || PLACEHOLDER;
-    imagePreview.classList.remove("hidden");
-    removeImageBtn.classList.remove("hidden");
+    imagePreview.src = imageSrc;
+
+    if (isPlaceholder) {
+      formPreviewWrapper.classList.add("placeholder");
+      removeImageBtn.classList.add("hidden");
+    } else {
+      formPreviewWrapper.classList.remove("placeholder");
+      removeImageBtn.classList.remove("hidden");
+    }
   }
 
   formPopup.classList.remove("hidden");
@@ -140,6 +167,7 @@ itemImage.onchange = () => {
   const reader = new FileReader();
   reader.onload = e => {
     imagePreview.src = e.target.result;
+    formPreviewWrapper.classList.remove("placeholder");
     removeImageBtn.classList.remove("hidden");
   };
   reader.readAsDataURL(file);
@@ -148,17 +176,22 @@ itemImage.onchange = () => {
 /* REMOVE IMAGE */
 removeImageBtn.onclick = () => {
   imagePreview.src = PLACEHOLDER;
+  formPreviewWrapper.classList.add("placeholder");
+  removeImageBtn.classList.add("hidden");
 };
 
 /* SAVE ITEM */
 document.getElementById("saveItem").onclick = () => {
   const title = itemName.value.trim();
-  const image = imagePreview.src || PLACEHOLDER;
+  let image = imagePreview.src || PLACEHOLDER;
 
   if (!title) {
     alert("Please enter a title.");
     return;
   }
+
+  // If somehow src is empty, fallback to placeholder
+  if (!image) image = PLACEHOLDER;
 
   if (formMode === "add") {
     items.push({ title, image });
@@ -168,6 +201,7 @@ document.getElementById("saveItem").onclick = () => {
 
   saveItems(items);
   renderCatalog();
+  updateCarouselFaces();
   formPopup.classList.add("hidden");
 };
 
@@ -194,17 +228,23 @@ function updateCarouselFaces() {
   }
 
   const item = items[flipIndex];
-  frontFace.innerHTML = `<img src="${item.image || PLACEHOLDER}" />`;
+  const imageSrc = item.image || PLACEHOLDER;
+
+  frontFace.innerHTML = `<img src="${imageSrc}" />`;
 }
 
 updateCarouselFaces();
 
 function flipTo(nextIndex, direction) {
   if (flipping) return;
+  if (items.length === 0) return;
+
   flipping = true;
 
   const nextItem = items[nextIndex];
-  backFace.innerHTML = `<img src="${nextItem.image || PLACEHOLDER}" />`;
+  const nextSrc = nextItem.image || PLACEHOLDER;
+
+  backFace.innerHTML = `<img src="${nextSrc}" />`;
 
   flipInner.style.transform =
     direction === "next" ? "rotateY(180deg)" : "rotateY(-180deg)";
