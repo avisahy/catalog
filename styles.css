@@ -1,19 +1,23 @@
 :root {
+  --bg: #ffffff;
+  --fg: #111111;
+  --card-bg: #f3f4f6;
+  --modal-bg: #ffffff;
+}
+
+body.dark {
   --bg: #0b1120;
   --fg: #e5e7eb;
-  --muted: #9ca3af;
-  --accent: #3b82f6;
-  --radius: 0.75rem;
-  --gap: 1rem;
-  --shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
-  --font-sans: system-ui, sans-serif;
+  --card-bg: #1f2937;
+  --modal-bg: #111827;
 }
 
 body {
   margin: 0;
-  background: #020617;
+  background: var(--bg);
   color: var(--fg);
-  font-family: var(--font-sans);
+  font-family: system-ui, sans-serif;
+  transition: background 0.3s, color 0.3s;
 }
 
 /* Top bar */
@@ -22,67 +26,64 @@ body {
   align-items: center;
   gap: 1rem;
   padding: 1rem;
-  background: #111827;
+  background: var(--card-bg);
   position: sticky;
   top: 0;
   z-index: 10;
 }
 
-.search-input {
-  flex: 1;
-  padding: 0.5rem 0.75rem;
-  border-radius: 9999px;
-  border: 1px solid #374151;
-  background: #0f172a;
-  color: var(--fg);
+.theme-toggle {
+  background: none;
+  border: none;
+  font-size: 1.4rem;
+  cursor: pointer;
 }
 
-/* Grid layout */
+.search-input {
+  flex: 1;
+  padding: 0.5rem;
+  border-radius: 8px;
+  border: 1px solid #999;
+}
+
+/* Grid */
 .catalog-container {
   width: 100%;
   max-width: 1120px;
   margin: 1.25rem auto;
-  padding: 0 1rem 1.5rem;
+  padding: 0 1rem;
   display: grid;
-  gap: 1.1rem;
+  gap: 1rem;
   grid-template-columns: repeat(4, 1fr);
 }
 
-/* Mobile: 2 columns */
 @media (max-width: 640px) {
   .catalog-container {
     grid-template-columns: repeat(2, 1fr);
   }
 }
 
-/* Image-only cards */
+/* Cards */
 .item-card {
   cursor: pointer;
 }
 
 .item-image {
   width: 100%;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 4/3;
   object-fit: cover;
-  border-radius: var(--radius);
-  transition: transform 150ms ease-out, box-shadow 150ms ease-out;
-}
-
-.item-image:hover {
-  transform: scale(1.03);
-  box-shadow: 0 12px 28px rgba(0,0,0,0.45);
+  border-radius: 10px;
 }
 
 /* Modal */
 .modal {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.65);
+  background: rgba(0,0,0,0.6);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 1rem;
-  z-index: 999;
 }
 
 .modal.hidden {
@@ -90,14 +91,13 @@ body {
 }
 
 .modal-content {
-  background: #111827;
-  padding: 1rem 1.25rem 1.5rem;
-  border-radius: 0.75rem;
-  max-width: 420px;
+  background: var(--modal-bg);
+  padding: 1rem;
+  border-radius: 10px;
   width: 100%;
-  color: #e5e7eb;
+  max-width: 420px;
+  color: var(--fg);
   position: relative;
-  box-shadow: 0 20px 40px rgba(0,0,0,0.55);
 }
 
 .modal-close {
@@ -106,19 +106,44 @@ body {
   right: 0.5rem;
   background: none;
   border: none;
-  color: #e5e7eb;
   font-size: 1.2rem;
   cursor: pointer;
 }
 
-.modal-image {
-  width: 100%;
-  border-radius: 0.5rem;
-  margin-bottom: 0.75rem;
+/* Add Item Button */
+.add-button {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  border: none;
+  background: #3b82f6;
+  color: white;
+  font-size: 2rem;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.3);
 }
 
-.modal-price {
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: #facc15;
+/* Inputs */
+.input {
+  width: 100%;
+  padding: 0.6rem;
+  margin-top: 0.6rem;
+  border-radius: 8px;
+  border: 1px solid #777;
+  background: var(--card-bg);
+  color: var(--fg);
+}
+
+.save-btn {
+  margin-top: 1rem;
+  width: 100%;
+  padding: 0.7rem;
+  background: #22c55e;
+  border: none;
+  color: white;
+  border-radius: 8px;
+  cursor: pointer;
 }
