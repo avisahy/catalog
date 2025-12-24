@@ -21,7 +21,52 @@ btnCarousel.onclick = () => {
   catalogUI.classList.add("hidden");
 };
 
-/* FLIP CAROUSEL */
+/* -------------------------
+   ITEM PREVIEW POPUP
+-------------------------- */
+const popup = document.getElementById("previewPopup");
+const previewTitle = document.getElementById("previewTitle");
+const editBtn = document.getElementById("editBtn");
+const deleteBtn = document.getElementById("deleteBtn");
+const closePopup = document.getElementById("closePopup");
+
+let selectedCard = null;
+
+// Open popup when clicking a card
+document.querySelectorAll(".card").forEach(card => {
+  card.addEventListener("click", () => {
+    selectedCard = card;
+    const title = card.querySelector("h2").textContent;
+    previewTitle.textContent = title;
+    popup.classList.remove("hidden");
+  });
+});
+
+// Close popup
+closePopup.onclick = () => {
+  popup.classList.add("hidden");
+};
+
+// Delete item
+deleteBtn.onclick = () => {
+  if (selectedCard) {
+    selectedCard.remove();
+    popup.classList.add("hidden");
+  }
+};
+
+// Edit item
+editBtn.onclick = () => {
+  if (selectedCard) {
+    const title = selectedCard.querySelector("h2").textContent;
+    alert("Editing: " + title);
+    popup.classList.add("hidden");
+  }
+};
+
+/* -------------------------
+   3D FLIP CAROUSEL
+-------------------------- */
 const items = [
   "Item 1","Item 2","Item 3","Item 4","Item 5",
   "Item 6","Item 7","Item 8","Item 9"
