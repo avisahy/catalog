@@ -2,149 +2,104 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0, viewport-fit=cover"
-  />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Catalog</title>
 
   <link rel="manifest" href="manifest.json" />
-  <meta name="theme-color" content="#0d1117" />
-
-  <link rel="icon" type="image/svg+xml" href="icon-192.svg" />
-  <link rel="apple-touch-icon" href="icon-192.svg" />
+  <meta name="theme-color" content="#d9d9d9" />
 
   <link rel="stylesheet" href="styles.css" />
 </head>
+
 <body>
   <div class="app">
 
-    <header class="app-header">
-      <h1 class="app-title">Catalog</h1>
-      <div class="app-header-right">
-        <button id="themeToggle" class="icon-button" aria-label="Toggle theme">
-          <span class="icon">🌙</span>
-        </button>
-        <button id="installButton" class="install-button" hidden>
-          Install
-        </button>
-      </div>
+    <!-- HEADER -->
+    <header class="header">
+      <h1 class="header-title">Catalog</h1>
+
+      <button id="themeToggle" class="icon-btn">
+        <span class="icon">🌙</span>
+      </button>
     </header>
 
-    <main class="app-main">
-      <section class="toolbar">
-        <input
-          id="searchInput"
-          class="search"
-          type="text"
-          placeholder="Search items..."
-          aria-label="Search items"
-        />
-      </section>
+    <!-- SEARCH -->
+    <div class="search-container">
+      <input id="searchInput" class="search-input" type="text" placeholder="Search items..." />
+    </div>
 
-      <section class="catalog" id="catalogList" aria-label="Item catalog">
-        <!-- Items injected by JS -->
-      </section>
+    <!-- GRID -->
+    <main id="catalogList" class="grid"></main>
+    <p id="emptyState" class="empty-state">No items yet. Tap “+ Add Item”.</p>
 
-      <p id="emptyState" class="empty-state">
-        No items yet. Tap “+ Add Item” to create your first one.
-      </p>
-    </main>
+    <!-- FAB -->
+    <button id="fabAdd" class="fab">+ Add Item</button>
 
-    <!-- Floating Action Button -->
-    <button id="fabAdd" class="fab" aria-label="Add item">
-      + Add Item
-    </button>
-
-    <!-- Add/Edit modal -->
-    <div class="modal-backdrop" id="itemModalBackdrop" hidden>
-      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <!-- ADD / EDIT MODAL -->
+    <div id="itemModalBackdrop" class="modal-backdrop" hidden>
+      <div class="modal">
         <div class="modal-header">
-          <h2 id="modalTitle">Add item</h2>
-          <button class="icon-button" id="closeModalButton" aria-label="Close">
-            ✕
-          </button>
+          <h2 id="modalTitle">Add Item</h2>
+          <button id="closeModalButton" class="icon-btn">✕</button>
         </div>
+
         <form id="itemForm" class="modal-body">
           <input type="hidden" id="itemId" />
 
           <label class="field">
             <span class="field-label">Name</span>
-            <input
-              id="itemName"
-              type="text"
-              required
-              placeholder="Item name"
-              autocomplete="off"
-            />
+            <input id="itemName" type="text" placeholder="Item name" required />
           </label>
 
-          <div class="field">
+          <label class="field">
             <span class="field-label">Picture</span>
 
-            <!-- Hidden file input -->
-            <input
-              id="itemImage"
-              type="file"
-              accept="image/*"
-              capture="environment"
-              class="file-input-hidden"
-            />
+            <input id="itemImage" type="file" accept="image/*" capture="environment" class="file-hidden" />
 
-            <!-- Custom clickable upload area -->
             <div id="uploadArea" class="upload-area">
-              Click here to upload picture
+              Tap here to upload picture
             </div>
-          </div>
+          </label>
 
           <div id="imagePreviewContainer" class="image-preview" hidden>
-            <img id="imagePreview" alt="Selected image preview" />
+            <img id="imagePreview" alt="Preview" />
           </div>
 
           <p id="formError" class="form-error" hidden></p>
 
           <div class="modal-footer">
-            <button type="button" class="secondary-button" id="cancelButton">
-              Cancel
-            </button>
-            <button type="submit" class="primary-button" id="saveButton">
-              Save
-            </button>
+            <button type="button" id="cancelButton" class="btn-secondary">Cancel</button>
+            <button type="submit" class="btn-primary">Save</button>
           </div>
         </form>
       </div>
     </div>
 
-    <!-- Detail modal -->
-    <div class="modal-backdrop" id="detailModalBackdrop" hidden>
-      <div class="modal modal-large" role="dialog" aria-modal="true" aria-labelledby="detailTitle">
+    <!-- DETAIL MODAL -->
+    <div id="detailModalBackdrop" class="modal-backdrop" hidden>
+      <div class="modal modal-large">
         <div class="modal-header">
           <h2 id="detailTitle">Item</h2>
-          <button class="icon-button" id="closeDetailButton" aria-label="Close">
-            ✕
-          </button>
+          <button id="closeDetailButton" class="icon-btn">✕</button>
         </div>
-        <div class="modal-body" id="detailBody">
-          <!-- Filled by JS -->
-        </div>
+
+        <div id="detailBody" class="modal-body"></div>
+
         <div class="modal-footer">
-          <button class="danger-button" id="deleteButton">
-            Delete
-          </button>
-          <button class="primary-button" id="editButton">
-            Edit
-          </button>
+          <button id="deleteButton" class="btn-danger">Delete</button>
+          <button id="editButton" class="btn-primary">Edit</button>
         </div>
       </div>
     </div>
 
-    <!-- FULL SCREEN IMAGE VIEWER -->
-    <div id="fullscreenViewer" class="fullscreen-viewer" hidden>
-      <img id="fullscreenImage" alt="Full screen view">
+    <!-- FULLSCREEN VIEWER -->
+    <div id="fullscreenViewer" class="fullscreen" hidden>
+      <img id="fullscreenImage" alt="Full screen" />
+      <input id="zoomSlider" type="range" min="1" max="4" step="0.1" value="1" class="zoom-slider" />
     </div>
 
   </div>
 
-  <script src="script.js" defer></script>
+  <script src="script.js"></script>
 </body>
 </html>
