@@ -1,3 +1,49 @@
+/* -------------------------
+   MODE SWITCHING
+-------------------------- */
+const catalogUI = document.getElementById("catalogUI");
+const carouselUI = document.getElementById("carouselUI");
+
+const btnCatalog = document.getElementById("btnCatalog");
+const btnCarousel = document.getElementById("btnCarousel");
+
+btnCatalog.onclick = () => {
+  catalogUI.classList.remove("hidden");
+  carouselUI.classList.add("hidden");
+  btnCatalog.classList.add("active");
+  btnCarousel.classList.remove("active");
+};
+
+btnCarousel.onclick = () => {
+  catalogUI.classList.add("hidden");
+  carouselUI.classList.remove("hidden");
+  btnCatalog.classList.remove("active");
+  btnCarousel.classList.add("active");
+};
+
+/* -------------------------
+   3D CATALOG UI TILT
+-------------------------- */
+document.querySelectorAll(".card").forEach(card => {
+  card.addEventListener("mousemove", e => {
+    const rect = card.getBoundingClientRect();
+    const x = e.clientX - rect.left - rect.width / 2;
+    const y = e.clientY - rect.top - rect.height / 2;
+
+    const rotateX = (y / rect.height) * -20;
+    const rotateY = (x / rect.width) * 20;
+
+    card.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+  });
+
+  card.addEventListener("mouseleave", () => {
+    card.style.transform = "rotateX(0deg) rotateY(0deg)";
+  });
+});
+
+/* -------------------------
+   3D CAROUSEL
+-------------------------- */
 const carousel = document.getElementById("carousel");
 const items = carousel.children;
 const total = items.length;
