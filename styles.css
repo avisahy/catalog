@@ -192,6 +192,7 @@ button {
   overflow: hidden;
   box-shadow: var(--shadow-soft);
   border: 1px solid rgba(148, 163, 184, 0.35);
+  display: block;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -205,9 +206,8 @@ button {
   padding: 0;
   margin: 0;
   border: none;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
+  display: block;
+  width: 100%;
 }
 
 .catalog-card-image-wrapper {
@@ -225,7 +225,7 @@ button {
   object-fit: cover;
 }
 
-/* HIDE NAME ON MAIN SCREEN */
+/* Hide body on main screen (only show picture) */
 .catalog-card-body {
   display: none;
 }
@@ -270,6 +270,7 @@ button {
 .modal-header {
   padding: 0.9rem 1rem 0.4rem;
   display: flex;
+  align-items: center;
   justify-content: space-between;
 }
 
@@ -301,8 +302,7 @@ button {
   color: #cbd5f5;
 }
 
-input[type="text"],
-input[type="file"] {
+input[type="text"] {
   border-radius: 0.85rem;
   border: 1px solid rgba(55, 65, 81, 0.8);
   padding: 0.5rem 0.7rem;
@@ -311,18 +311,21 @@ input[type="file"] {
   color: inherit;
 }
 
-/* HIDE "No file selected" */
-
-input[type="file"] {
-  color: transparent;
+/* Hide native file input completely */
+.file-input-hidden {
+  display: none;
 }
 
-input[type="file"]::file-selector-button {
-  background: var(--primary);
-  color: var(--primary-contrast);
-  border: none;
-  border-radius: 999px;
-  padding: 0.4rem 0.9rem;
+/* Custom upload area */
+
+.upload-area {
+  border-radius: 0.85rem;
+  border: 1px dashed rgba(148, 163, 184, 0.9);
+  padding: 0.7rem 0.8rem;
+  font-size: 0.9rem;
+  text-align: center;
+  color: #cbd5f5;
+  background: rgba(15, 23, 42, 0.7);
   cursor: pointer;
 }
 
