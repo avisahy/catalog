@@ -59,8 +59,21 @@ const step = 360 / total;
 // Position items in a circle
 for (let i = 0; i < total; i++) {
   const rotate = step * i;
-  const depth = window.innerWidth < 600 ? 180 : 300;
-  items[i].style.transform = `rotateY(${rotate}deg) translateZ(${depth}px)`;
+  
+function getDepth() {
+  return carousel.offsetWidth * 0.9;
+}
+
+  function positionItems() {
+  const depth = getDepth();
+  for (let i = 0; i < total; i++) {
+    const rotate = step * i;
+    items[i].style.transform = `rotateY(${rotate}deg) translateZ(${depth}px)`;
+  }
+}
+
+positionItems();
+window.addEventListener("resize", positionItems);
 }
 
 // Rotate carousel
