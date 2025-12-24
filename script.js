@@ -16,6 +16,7 @@ const itemForm = document.getElementById("itemForm");
 const itemIdInput = document.getElementById("itemId");
 const itemNameInput = document.getElementById("itemName");
 const itemImageInput = document.getElementById("itemImage");
+const uploadArea = document.getElementById("uploadArea");
 const imagePreviewContainer = document.getElementById("imagePreviewContainer");
 const imagePreview = document.getElementById("imagePreview");
 const formError = document.getElementById("formError");
@@ -26,12 +27,10 @@ const themeToggle = document.getElementById("themeToggle");
 const installButton = document.getElementById("installButton");
 const fabAdd = document.getElementById("fabAdd");
 const searchInput = document.getElementById("searchInput");
-
-// FULL SCREEN VIEWER
 const fullscreenViewer = document.getElementById("fullscreenViewer");
 const fullscreenImage = document.getElementById("fullscreenImage");
 
-// Load items
+// Storage
 function loadItems() {
   try {
     items = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
@@ -54,7 +53,11 @@ function applyTheme(theme) {
 
 function initTheme() {
   const stored = localStorage.getItem(THEME_KEY);
-  applyTheme(stored || "light");
+  if (stored === "light" || stored === "dark") {
+    applyTheme(stored);
+  } else {
+    applyTheme("light");
+  }
 }
 
 // Render catalog
@@ -76,6 +79,7 @@ function renderCatalog(list = items) {
       card.className = "catalog-card";
 
       const button = document.createElement("button");
+      button.type = "button";
       button.className = "catalog-card-button";
       button.addEventListener("click", () => openDetailModal(item.id));
 
@@ -85,9 +89,14 @@ function renderCatalog(list = items) {
       const img = document.createElement("img");
       img.className = "catalog-card-image";
       img.src = item.imageDataUrl;
+      img.alt = item.name || "Catalog item";
 
       imageWrapper.appendChild(img);
+      const body = document.createElement("div");
+      body.className = "catalog-card-body";
+
       button.appendChild(imageWrapper);
+      button.appendChild(body);
       card.appendChild(button);
       catalogList.appendChild(card);
     });
@@ -101,18 +110,21 @@ function resetForm() {
   imagePreviewContainer.hidden = true;
   imagePreview.src = "";
   formError.hidden = true;
+  formError.textContent = "";
 }
 
 function openItemModal(mode, item) {
   resetForm();
-  document.getElementById("modalTitle").textContent =
-    mode === "edit" ? "Edit item" : "Add item";
+  const modalTitle = document.getElementById("modalTitle");
+  modalTitle.textContent = mode === "edit" ? "Edit item" : "Add item";
 
-  if (item) {
+  if (mode === "edit" && item) {
     itemIdInput.value = item.id;
     itemNameInput.value = item.name;
-    imagePreview.src = item.imageDataUrl;
-    imagePreviewContainer.hidden = false;
+    if (item.imageDataUrl) {
+      imagePreview.src = item.imageDataUrl;
+      imagePreviewContainer.hidden = false;
+    }
   }
 
   itemModalBackdrop.hidden = false;
@@ -128,45 +140,55 @@ function openDetailModal(id) {
 
   detailBody.innerHTML = "";
 
-  const imgWrapper = document.createElement("div");
-  imgWrapper.className = "detail-image-wrapper";
+  const imageWrapper = document.createElement("div");
+  imageWrapper.className = "detail-image-wrapper";
 
   const img = document.createElement("img");
   img.src = item.imageDataUrl;
+  img.alt = item.name || "Catalog item";
 
-  // FULL SCREEN VIEWER
+  // Full-screen viewer on click
   img.addEventListener("click", () => {
     fullscreenImage.src = item.imageDataUrl;
     fullscreenViewer.hidden = false;
   });
 
-  imgWrapper.appendChild(img);
+  imageWrapper.appendChild(img);
 
   const nameEl = document.createElement("p");
   nameEl.className = "detail-name";
-  nameEl.textContent = item.name;
+  nameEl.textContent = item.name || "Untitled item";
 
-  detailBody.appendChild(imgWrapper);
+  detailBody.appendChild(imageWrapper);
   detailBody.appendChild(nameEl);
 
-  detailModalBackdrop.dataset.itemId = id;
+  detailModalBackdrop.dataset.itemId = String(item.id);
   detailModalBackdrop.hidden = false;
 }
 
 function closeDetailModal() {
   detailModalBackdrop.hidden = true;
+  delete detailModalBackdrop.dataset.itemId;
 }
 
-// Full screen viewer close
+// Full-screen viewer close
 fullscreenViewer.addEventListener("click", () => {
   fullscreenViewer.hidden = true;
 });
 
-// Image preview
-itemImageInput.addEventListener("change", async () => {
-  const file = itemImageInput.files?.[0];
-  if (!file) return;
+// Upload area: open hidden file input
+uploadArea.addEventListener("click", () => {
+  itemImageInput.click();
+});
 
+// Image preview
+itemImageInput.addEventListener("change", () => {
+  const file = itemImageInput.files && itemImageInput.files[0];
+  if (!file) {
+    imagePreviewContainer.hidden = true;
+    imagePreview.src = "";
+    return;
+  }
   const reader = new FileReader();
   reader.onload = () => {
     imagePreview.src = reader.result;
@@ -176,53 +198,62 @@ itemImageInput.addEventListener("change", async () => {
 });
 
 // Search
-searchInput.addEventListener("input", (e) => {
-  const q = e.target.value.toLowerCase();
-  renderCatalog(items.filter((i) => i.name.toLowerCase().includes(q)));
+searchInput.addEventListener("input", (event) => {
+  const q = event.target.value.toLowerCase();
+  const filtered = items.filter((i) =>
+    (i.name || "").toLowerCase().includes(q)
+  );
+  renderCatalog(filtered);
 });
 
-// Save item
-itemForm.addEventListener("submit", async (e) => {
-  e.preventDefault();
+// Add/edit submit
+itemForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  formError.hidden = true;
+  formError.textContent = "";
 
-  const id = itemIdInput.value;
+  const id = itemIdInput.value.trim();
   const name = itemNameInput.value.trim();
 
-  if (!name) return;
+  if (!name) {
+    formError.textContent = "Please enter a name.";
+    formError.hidden = false;
+    setTimeout(() => (formError.hidden = true), 5000);
+    return;
+  }
 
-  let imageDataUrl = null;
+  const existing = id ? items.find((i) => String(i.id) === id) : null;
+  let newImageDataUrl = existing ? existing.imageDataUrl : null;
 
-  const file = itemImageInput.files?.[0];
+  const file = itemImageInput.files && itemImageInput.files[0];
+
   if (file) {
     const reader = new FileReader();
     reader.onload = () => {
-      imageDataUrl = reader.result;
-      finalizeSave();
+      newImageDataUrl = reader.result;
+      finishSave();
     };
     reader.readAsDataURL(file);
   } else {
-    const existing = items.find((i) => i.id == id);
-    imageDataUrl = existing?.imageDataUrl;
-    finalizeSave();
+    finishSave();
   }
 
-  function finalizeSave() {
-    if (!imageDataUrl) {
+  function finishSave() {
+    if (!newImageDataUrl) {
       formError.textContent = "Please select a picture.";
       formError.hidden = false;
       setTimeout(() => (formError.hidden = true), 5000);
       return;
     }
 
-    if (id) {
-      const item = items.find((i) => i.id == id);
-      item.name = name;
-      item.imageDataUrl = imageDataUrl;
+    if (existing) {
+      existing.name = name;
+      existing.imageDataUrl = newImageDataUrl;
     } else {
       items.push({
         id: Date.now(),
         name,
-        imageDataUrl,
+        imageDataUrl: newImageDataUrl,
         createdAt: Date.now(),
       });
     }
@@ -233,31 +264,88 @@ itemForm.addEventListener("submit", async (e) => {
   }
 });
 
-// Edit
+// Edit from detail
 editButton.addEventListener("click", () => {
-  const id = detailModalBackdrop.dataset.itemId;
-  const item = items.find((i) => i.id == id);
+  const idAttr = detailModalBackdrop.dataset.itemId;
+  if (!idAttr) return;
+  const id = Number(idAttr);
+  const item = items.find((i) => i.id === id);
+  if (!item) return;
+
   closeDetailModal();
   openItemModal("edit", item);
 });
 
-// Delete
+// Delete from detail
 deleteButton.addEventListener("click", () => {
-  const id = detailModalBackdrop.dataset.itemId;
-  items = items.filter((i) => i.id != id);
+  const idAttr = detailModalBackdrop.dataset.itemId;
+  if (!idAttr) return;
+  const id = Number(idAttr);
+
+  const confirmDelete = window.confirm(
+    "Delete this item? This cannot be undone."
+  );
+  if (!confirmDelete) return;
+
+  items = items.filter((i) => i.id !== id);
   saveItems();
   renderCatalog();
   closeDetailModal();
 });
 
-// Theme toggle
-themeToggle.addEventListener("click", () => {
-  const current = document.documentElement.getAttribute("data-theme");
-  applyTheme(current === "light" ? "dark" : "light");
+// Close buttons and backdrop clicks
+closeModalButton.addEventListener("click", closeItemModal);
+cancelButton.addEventListener("click", closeItemModal);
+
+itemModalBackdrop.addEventListener("click", (e) => {
+  if (e.target === itemModalBackdrop) {
+    closeItemModal();
+  }
+});
+
+closeDetailButton.addEventListener("click", closeDetailModal);
+
+detailModalBackdrop.addEventListener("click", (e) => {
+  if (e.target === detailModalBackdrop) {
+    closeDetailModal();
+  }
 });
 
 // FAB
 fabAdd.addEventListener("click", () => openItemModal("add"));
+
+// Theme toggle
+themeToggle.addEventListener("click", () => {
+  const current = document.documentElement.getAttribute("data-theme") || "light";
+  applyTheme(current === "light" ? "dark" : "light");
+});
+
+// PWA install
+window.addEventListener("beforeinstallprompt", (event) => {
+  event.preventDefault();
+  deferredInstallPrompt = event;
+  installButton.hidden = false;
+});
+
+installButton.addEventListener("click", async () => {
+  if (!deferredInstallPrompt) return;
+  installButton.hidden = true;
+  deferredInstallPrompt.prompt();
+  const result = await deferredInstallPrompt.userChoice;
+  if (result.outcome !== "accepted") {
+    installButton.hidden = false;
+  }
+  deferredInstallPrompt = null;
+});
+
+// Service worker
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker
+      .register("./service-worker.js")
+      .catch((err) => console.error("SW registration failed", err));
+  });
+}
 
 // Init
 function init() {
