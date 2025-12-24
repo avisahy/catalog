@@ -47,7 +47,7 @@ document.querySelectorAll(".card").forEach(card => {
 });
 
 /* -------------------------
-   3D CAROUSEL (CENTERED + NO DRIFT)
+   3D CAROUSEL — PERFECT CENTER FIX
 -------------------------- */
 const carousel = document.getElementById("carousel");
 const items = carousel.children;
@@ -56,9 +56,10 @@ const total = items.length;
 let angle = 0;
 const step = 360 / total;
 
-// Depth always matches carousel size
+// Depth always matches wrapper size
 function getDepth() {
-  return carousel.offsetWidth * 0.9;
+  const wrapper = document.querySelector(".carousel-wrapper");
+  return wrapper.offsetWidth * 0.9;
 }
 
 function positionItems() {
