@@ -98,6 +98,9 @@ body {
   max-width: 420px;
   color: var(--fg);
   position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
 }
 
 .modal-close {
@@ -108,6 +111,11 @@ body {
   border: none;
   font-size: 1.2rem;
   cursor: pointer;
+}
+
+.modal-image {
+  width: 100%;
+  border-radius: 10px;
 }
 
 /* Add Item Button */
@@ -130,15 +138,34 @@ body {
 .input {
   width: 100%;
   padding: 0.6rem;
-  margin-top: 0.6rem;
   border-radius: 8px;
   border: 1px solid #777;
   background: var(--card-bg);
   color: var(--fg);
 }
 
-.save-btn {
+.pick-btn {
+  width: 100%;
+  padding: 0.7rem;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.preview {
+  width: 100%;
   margin-top: 1rem;
+  border-radius: 10px;
+}
+
+.hidden {
+  display: none;
+}
+
+.save-btn {
+  margin-top: 0.5rem;
   width: 100%;
   padding: 0.7rem;
   background: #22c55e;
