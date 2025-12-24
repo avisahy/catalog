@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>3D Catalog + Carousel</title>
+  <title>3D Flip Carousel</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -13,11 +13,11 @@
 
     <div class="switcher">
       <button id="btnCatalog" class="active">3D Catalog UI</button>
-      <button id="btnCarousel">3D Carousel</button>
+      <button id="btnCarousel">3D Flip Carousel</button>
     </div>
   </header>
 
-  <!-- 3D CATALOG UI (DEFAULT) -->
+  <!-- 3D CATALOG UI -->
   <main id="catalogUI" class="catalog fade">
     <div class="card"><div class="card-inner"><h2>Item 1</h2></div></div>
     <div class="card"><div class="card-inner"><h2>Item 2</h2></div></div>
@@ -29,19 +29,12 @@
     <div class="card"><div class="card-inner"><h2>Item 8</h2></div></div>
   </main>
 
-  <!-- 3D CAROUSEL UI -->
-  <main id="carouselUI" class="carousel-container fade hidden">
-    <div class="carousel-center">
-      <div class="carousel" id="carousel">
-        <div class="item">Item 1</div>
-        <div class="item">Item 2</div>
-        <div class="item">Item 3</div>
-        <div class="item">Item 4</div>
-        <div class="item">Item 5</div>
-        <div class="item">Item 6</div>
-        <div class="item">Item 7</div>
-        <div class="item">Item 8</div>
-        <div class="item">Item 9</div>
+  <!-- 3D FLIP CAROUSEL -->
+  <main id="carouselUI" class="flip-container fade hidden">
+    <div class="flip-card" id="flipCard">
+      <div class="flip-inner" id="flipInner">
+        <div class="flip-face front" id="frontFace">Item 1</div>
+        <div class="flip-face back" id="backFace">Item 2</div>
       </div>
     </div>
 
