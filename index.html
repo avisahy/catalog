@@ -38,7 +38,9 @@
   <!-- ITEM PREVIEW POPUP -->
   <div id="previewPopup" class="popup hidden">
     <div class="popup-content">
-      <img id="previewImage" class="popup-img" />
+      <div class="preview-img-wrapper" id="previewWrapper">
+        <img id="previewImage" class="popup-img" />
+      </div>
       <h2 id="previewTitle"></h2>
 
       <div class="popup-buttons">
@@ -62,7 +64,9 @@
         <input id="itemImage" type="file" accept="image/*" />
       </label>
 
-      <img id="imagePreview" class="preview-square hidden" />
+      <div class="preview-img-wrapper" id="formPreviewWrapper">
+        <img id="imagePreview" class="preview-square" />
+      </div>
 
       <button id="removeImage" class="remove-img-btn hidden">Remove Image</button>
 
