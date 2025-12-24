@@ -59,7 +59,8 @@ const step = 360 / total;
 // Position items in a circle
 for (let i = 0; i < total; i++) {
   const rotate = step * i;
-  items[i].style.transform = `rotateY(${rotate}deg) translateZ(300px)`;
+  const depth = window.innerWidth < 600 ? 180 : 300;
+items[i].style.transform = `rotateY(${rotate}deg) translateZ(${depth}px)`;
 }
 
 // Rotate carousel
