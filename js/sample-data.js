@@ -6,6 +6,7 @@ const SAMPLE_ITEMS = [
         description: "This is a sample item.",
         price: 10,
         imageUrl: "assets/placeholder.png",
+        imageData: "",
         createdAt: Date.now()
     },
     {
@@ -15,6 +16,7 @@ const SAMPLE_ITEMS = [
         description: "Another sample item.",
         price: 20,
         imageUrl: "assets/placeholder.png",
+        imageData: "",
         createdAt: Date.now()
     }
 ];
