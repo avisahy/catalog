@@ -1,194 +1,159 @@
-const STORAGE_KEY = "catalog_items_v1";
-const THEME_KEY = "catalog_theme";
+/* ============================================================
+   STATE & STORAGE
+============================================================ */
+let items = JSON.parse(localStorage.getItem("catalogItems") || "[]");
 
-let items = [];
-let deferredInstallPrompt = null;
+function saveItems() {
+  localStorage.setItem("catalogItems", JSON.stringify(items));
+}
 
-// DOM
+/* ============================================================
+   ELEMENTS
+============================================================ */
 const catalogList = document.getElementById("catalogList");
 const emptyState = document.getElementById("emptyState");
+
+const fabAdd = document.getElementById("fabAdd");
+
 const itemModalBackdrop = document.getElementById("itemModalBackdrop");
-const detailModalBackdrop = document.getElementById("detailModalBackdrop");
-const closeModalButton = document.getElementById("closeModalButton");
-const closeDetailButton = document.getElementById("closeDetailButton");
-const cancelButton = document.getElementById("cancelButton");
 const itemForm = document.getElementById("itemForm");
-const itemIdInput = document.getElementById("itemId");
-const itemNameInput = document.getElementById("itemName");
-const itemImageInput = document.getElementById("itemImage");
+const modalTitle = document.getElementById("modalTitle");
+const closeModalButton = document.getElementById("closeModalButton");
+const cancelButton = document.getElementById("cancelButton");
+
+const itemIdField = document.getElementById("itemId");
+const itemNameField = document.getElementById("itemName");
+const itemImageField = document.getElementById("itemImage");
+
 const uploadArea = document.getElementById("uploadArea");
 const imagePreviewContainer = document.getElementById("imagePreviewContainer");
 const imagePreview = document.getElementById("imagePreview");
+
 const formError = document.getElementById("formError");
+
+const detailModalBackdrop = document.getElementById("detailModalBackdrop");
+const detailTitle = document.getElementById("detailTitle");
 const detailBody = document.getElementById("detailBody");
+const closeDetailButton = document.getElementById("closeDetailButton");
 const deleteButton = document.getElementById("deleteButton");
 const editButton = document.getElementById("editButton");
-const themeToggle = document.getElementById("themeToggle");
-const installButton = document.getElementById("installButton");
-const fabAdd = document.getElementById("fabAdd");
-const searchInput = document.getElementById("searchInput");
+
 const fullscreenViewer = document.getElementById("fullscreenViewer");
 const fullscreenImage = document.getElementById("fullscreenImage");
+const zoomSlider = document.getElementById("zoomSlider");
 
-// Storage
-function loadItems() {
-  try {
-    items = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-  } catch {
-    items = [];
-  }
-}
+const searchInput = document.getElementById("searchInput");
+const themeToggle = document.getElementById("themeToggle");
 
-function saveItems() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-}
-
-// Theme
-function applyTheme(theme) {
-  document.documentElement.setAttribute("data-theme", theme);
-  localStorage.setItem(THEME_KEY, theme);
-  themeToggle.querySelector(".icon").textContent =
-    theme === "dark" ? "☀️" : "🌙";
-}
-
-function initTheme() {
-  const stored = localStorage.getItem(THEME_KEY);
-  if (stored === "light" || stored === "dark") {
-    applyTheme(stored);
-  } else {
-    applyTheme("light");
-  }
-}
-
-// Render catalog
-function renderCatalog(list = items) {
+/* ============================================================
+   RENDERING
+============================================================ */
+function renderItems() {
   catalogList.innerHTML = "";
 
-  if (!list.length) {
-    emptyState.hidden = false;
+  const query = searchInput.value.toLowerCase();
+  const filtered = items.filter(i => i.name.toLowerCase().includes(query));
+
+  if (filtered.length === 0) {
+    emptyState.style.display = "block";
     return;
   }
 
-  emptyState.hidden = true;
+  emptyState.style.display = "none";
 
-  list
-    .slice()
-    .sort((a, b) => b.createdAt - a.createdAt)
-    .forEach((item) => {
-      const card = document.createElement("article");
-      card.className = "catalog-card";
-
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "catalog-card-button";
-      button.addEventListener("click", () => openDetailModal(item.id));
-
-      const imageWrapper = document.createElement("div");
-      imageWrapper.className = "catalog-card-image-wrapper";
-
-      const img = document.createElement("img");
-      img.className = "catalog-card-image";
-      img.src = item.imageDataUrl;
-      img.alt = item.name || "Catalog item";
-
-      imageWrapper.appendChild(img);
-      const body = document.createElement("div");
-      body.className = "catalog-card-body";
-
-      button.appendChild(imageWrapper);
-      button.appendChild(body);
-      card.appendChild(button);
-      catalogList.appendChild(card);
-    });
+  filtered.forEach(item => {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <img src="${item.image}" alt="${item.name}" />
+      <div class="card-title">${item.name}</div>
+    `;
+    card.onclick = () => openDetailModal(item.id);
+    catalogList.appendChild(card);
+  });
 }
 
-// Modals
-function resetForm() {
-  itemIdInput.value = "";
-  itemNameInput.value = "";
-  itemImageInput.value = "";
-  imagePreviewContainer.hidden = true;
-  imagePreview.src = "";
-  formError.hidden = true;
-  formError.textContent = "";
-}
-
-function openItemModal(mode, item) {
-  resetForm();
-  const modalTitle = document.getElementById("modalTitle");
-  modalTitle.textContent = mode === "edit" ? "Edit item" : "Add item";
-
-  if (mode === "edit" && item) {
-    itemIdInput.value = item.id;
-    itemNameInput.value = item.name;
-    if (item.imageDataUrl) {
-      imagePreview.src = item.imageDataUrl;
-      imagePreviewContainer.hidden = false;
-    }
-  }
-
+/* ============================================================
+   ADD / EDIT MODAL
+============================================================ */
+function openItemModal(editItem = null) {
   itemModalBackdrop.hidden = false;
+
+  if (editItem) {
+    modalTitle.textContent = "Edit Item";
+    itemIdField.value = editItem.id;
+    itemNameField.value = editItem.name;
+    imagePreview.src = editItem.image;
+    imagePreviewContainer.hidden = false;
+  } else {
+    modalTitle.textContent = "Add Item";
+    itemIdField.value = "";
+    itemNameField.value = "";
+    itemImageField.value = "";
+    imagePreviewContainer.hidden = true;
+  }
 }
 
 function closeItemModal() {
   itemModalBackdrop.hidden = true;
+  formError.hidden = true;
+  formError.classList.remove("visible");
 }
 
+/* ============================================================
+   DETAIL MODAL
+============================================================ */
+let currentDetailId = null;
+
 function openDetailModal(id) {
-  const item = items.find((i) => i.id === id);
+  const item = items.find(i => i.id === id);
   if (!item) return;
 
-  detailBody.innerHTML = "";
+  currentDetailId = id;
 
-  const imageWrapper = document.createElement("div");
-  imageWrapper.className = "detail-image-wrapper";
+  detailTitle.textContent = item.name;
+  detailBody.innerHTML = `
+    <img src="${item.image}" alt="${item.name}" style="width:100%; border-radius:16px; margin-bottom:16px;" />
+  `;
 
-  const img = document.createElement("img");
-  img.src = item.imageDataUrl;
-  img.alt = item.name || "Catalog item";
-
-  // Full-screen viewer on click
-  img.addEventListener("click", () => {
-    fullscreenImage.src = item.imageDataUrl;
-    fullscreenViewer.hidden = false;
-  });
-
-  imageWrapper.appendChild(img);
-
-  const nameEl = document.createElement("p");
-  nameEl.className = "detail-name";
-  nameEl.textContent = item.name || "Untitled item";
-
-  detailBody.appendChild(imageWrapper);
-  detailBody.appendChild(nameEl);
-
-  detailModalBackdrop.dataset.itemId = String(item.id);
   detailModalBackdrop.hidden = false;
 }
 
 function closeDetailModal() {
   detailModalBackdrop.hidden = true;
-  delete detailModalBackdrop.dataset.itemId;
 }
 
-// Full-screen viewer close
-fullscreenViewer.addEventListener("click", () => {
-  fullscreenViewer.hidden = true;
-});
+/* ============================================================
+   FULLSCREEN VIEWER
+============================================================ */
+function openFullscreen(src) {
+  fullscreenImage.src = src;
+  fullscreenViewer.hidden = false;
+  zoomSlider.value = 1;
+  fullscreenImage.style.transform = "scale(1)";
+}
 
-// Upload area: open hidden file input
-uploadArea.addEventListener("click", () => {
-  itemImageInput.click();
-});
-
-// Image preview
-itemImageInput.addEventListener("change", () => {
-  const file = itemImageInput.files && itemImageInput.files[0];
-  if (!file) {
-    imagePreviewContainer.hidden = true;
-    imagePreview.src = "";
-    return;
+fullscreenViewer.addEventListener("click", e => {
+  if (e.target === fullscreenViewer) {
+    fullscreenViewer.hidden = true;
+    zoomSlider.value = 1;
+    fullscreenImage.style.transform = "scale(1)";
   }
+});
+
+zoomSlider.addEventListener("input", () => {
+  fullscreenImage.style.transform = `scale(${zoomSlider.value})`;
+});
+
+/* ============================================================
+   UPLOAD AREA
+============================================================ */
+uploadArea.addEventListener("click", () => itemImageField.click());
+
+itemImageField.addEventListener("change", () => {
+  const file = itemImageField.files[0];
+  if (!file) return;
+
   const reader = new FileReader();
   reader.onload = () => {
     imagePreview.src = reader.result;
@@ -197,161 +162,101 @@ itemImageInput.addEventListener("change", () => {
   reader.readAsDataURL(file);
 });
 
-// Search
-searchInput.addEventListener("input", (event) => {
-  const q = event.target.value.toLowerCase();
-  const filtered = items.filter((i) =>
-    (i.name || "").toLowerCase().includes(q)
-  );
-  renderCatalog(filtered);
-});
+/* ============================================================
+   FORM SUBMIT
+============================================================ */
+itemForm.addEventListener("submit", e => {
+  e.preventDefault();
 
-// Add/edit submit
-itemForm.addEventListener("submit", (event) => {
-  event.preventDefault();
-  formError.hidden = true;
-  formError.textContent = "";
+  const id = itemIdField.value;
+  const name = itemNameField.value.trim();
 
-  const id = itemIdInput.value.trim();
-  const name = itemNameInput.value.trim();
+  let imageData = imagePreview.src || "";
 
-  if (!name) {
-    formError.textContent = "Please enter a name.";
-    formError.hidden = false;
-    setTimeout(() => (formError.hidden = true), 5000);
+  if (!id && (!itemImageField.files[0] || !imageData)) {
+    showFormError("Please select a picture.");
     return;
   }
 
-  const existing = id ? items.find((i) => String(i.id) === id) : null;
-  let newImageDataUrl = existing ? existing.imageDataUrl : null;
-
-  const file = itemImageInput.files && itemImageInput.files[0];
-
-  if (file) {
-    const reader = new FileReader();
-    reader.onload = () => {
-      newImageDataUrl = reader.result;
-      finishSave();
-    };
-    reader.readAsDataURL(file);
+  if (id) {
+    const item = items.find(i => i.id === id);
+    item.name = name;
+    item.image = imageData;
   } else {
-    finishSave();
+    items.push({
+      id: crypto.randomUUID(),
+      name,
+      image: imageData
+    });
   }
 
-  function finishSave() {
-    if (!newImageDataUrl) {
-      formError.textContent = "Please select a picture.";
-      formError.hidden = false;
-      setTimeout(() => (formError.hidden = true), 5000);
-      return;
-    }
-
-    if (existing) {
-      existing.name = name;
-      existing.imageDataUrl = newImageDataUrl;
-    } else {
-      items.push({
-        id: Date.now(),
-        name,
-        imageDataUrl: newImageDataUrl,
-        createdAt: Date.now(),
-      });
-    }
-
-    saveItems();
-    renderCatalog();
-    closeItemModal();
-  }
-});
-
-// Edit from detail
-editButton.addEventListener("click", () => {
-  const idAttr = detailModalBackdrop.dataset.itemId;
-  if (!idAttr) return;
-  const id = Number(idAttr);
-  const item = items.find((i) => i.id === id);
-  if (!item) return;
-
-  closeDetailModal();
-  openItemModal("edit", item);
-});
-
-// Delete from detail
-deleteButton.addEventListener("click", () => {
-  const idAttr = detailModalBackdrop.dataset.itemId;
-  if (!idAttr) return;
-  const id = Number(idAttr);
-
-  const confirmDelete = window.confirm(
-    "Delete this item? This cannot be undone."
-  );
-  if (!confirmDelete) return;
-
-  items = items.filter((i) => i.id !== id);
   saveItems();
-  renderCatalog();
+  renderItems();
+  closeItemModal();
+});
+
+/* ============================================================
+   TOOLTIP FADE
+============================================================ */
+function showFormError(msg) {
+  formError.textContent = msg;
+  formError.hidden = false;
+
+  requestAnimationFrame(() => {
+    formError.classList.add("visible");
+  });
+
+  setTimeout(() => {
+    formError.classList.remove("visible");
+    setTimeout(() => (formError.hidden = true), 400);
+  }, 2500);
+}
+
+/* ============================================================
+   DELETE / EDIT
+============================================================ */
+deleteButton.addEventListener("click", () => {
+  items = items.filter(i => i.id !== currentDetailId);
+  saveItems();
+  renderItems();
   closeDetailModal();
 });
 
-// Close buttons and backdrop clicks
+editButton.addEventListener("click", () => {
+  const item = items.find(i => i.id === currentDetailId);
+  closeDetailModal();
+  openItemModal(item);
+});
+
+/* ============================================================
+   SEARCH
+============================================================ */
+searchInput.addEventListener("input", renderItems);
+
+/* ============================================================
+   THEME TOGGLE
+============================================================ */
+themeToggle.addEventListener("click", () => {
+  const isDark = document.body.getAttribute("data-theme") === "dark";
+  document.body.setAttribute("data-theme", isDark ? "light" : "dark");
+});
+
+/* ============================================================
+   EVENT LISTENERS
+============================================================ */
+fabAdd.addEventListener("click", () => openItemModal());
 closeModalButton.addEventListener("click", closeItemModal);
 cancelButton.addEventListener("click", closeItemModal);
 
-itemModalBackdrop.addEventListener("click", (e) => {
-  if (e.target === itemModalBackdrop) {
-    closeItemModal();
-  }
-});
-
 closeDetailButton.addEventListener("click", closeDetailModal);
 
-detailModalBackdrop.addEventListener("click", (e) => {
-  if (e.target === detailModalBackdrop) {
-    closeDetailModal();
+detailBody.addEventListener("click", e => {
+  if (e.target.tagName === "IMG") {
+    openFullscreen(e.target.src);
   }
 });
 
-// FAB
-fabAdd.addEventListener("click", () => openItemModal("add"));
-
-// Theme toggle
-themeToggle.addEventListener("click", () => {
-  const current = document.documentElement.getAttribute("data-theme") || "light";
-  applyTheme(current === "light" ? "dark" : "light");
-});
-
-// PWA install
-window.addEventListener("beforeinstallprompt", (event) => {
-  event.preventDefault();
-  deferredInstallPrompt = event;
-  installButton.hidden = false;
-});
-
-installButton.addEventListener("click", async () => {
-  if (!deferredInstallPrompt) return;
-  installButton.hidden = true;
-  deferredInstallPrompt.prompt();
-  const result = await deferredInstallPrompt.userChoice;
-  if (result.outcome !== "accepted") {
-    installButton.hidden = false;
-  }
-  deferredInstallPrompt = null;
-});
-
-// Service worker
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker
-      .register("./service-worker.js")
-      .catch((err) => console.error("SW registration failed", err));
-  });
-}
-
-// Init
-function init() {
-  initTheme();
-  loadItems();
-  renderCatalog();
-}
-
-document.addEventListener("DOMContentLoaded", init);
+/* ============================================================
+   INIT
+============================================================ */
+renderItems();
