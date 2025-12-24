@@ -8,11 +8,9 @@
   />
   <title>Catalog</title>
 
-  <!-- PWA basics -->
   <link rel="manifest" href="manifest.json" />
-  <meta name="theme-color" content="#111827" />
+  <meta name="theme-color" content="#0d1117" />
 
-  <!-- App icons (using SVG as example; you can replace with PNGs) -->
   <link rel="icon" type="image/svg+xml" href="icon-192.svg" />
   <link rel="apple-touch-icon" href="icon-192.svg" />
 
@@ -36,9 +34,13 @@
 
     <main class="app-main">
       <section class="toolbar">
-        <button id="addItemButton" class="primary-button">
-          + Add item
-        </button>
+        <input
+          id="searchInput"
+          class="search"
+          type="text"
+          placeholder="Search items..."
+          aria-label="Search items"
+        />
       </section>
 
       <section class="catalog" id="catalogList" aria-label="Item catalog">
@@ -46,9 +48,14 @@
       </section>
 
       <p id="emptyState" class="empty-state">
-        No items yet. Tap “Add item” to create your first one.
+        No items yet. Tap “+ Add Item” to create your first one.
       </p>
     </main>
+
+    <!-- Floating Action Button -->
+    <button id="fabAdd" class="fab" aria-label="Add item">
+      + Add Item
+    </button>
 
     <!-- Add/Edit modal -->
     <div class="modal-backdrop" id="itemModalBackdrop" hidden>
