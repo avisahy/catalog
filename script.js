@@ -12,43 +12,46 @@ document.getElementById("btnCarousel").onclick = () => {
   catalogUI.classList.add("hidden");
 };
 
-/* CARD TILT */
-document.querySelectorAll(".card").forEach(card => {
-  card.addEventListener("mousemove", e => {
-    const r = card.getBoundingClientRect();
-    const x = e.clientX - r.left - r.width / 2;
-    const y = e.clientY - r.top - r.height / 2;
-    card.style.transform = `rotateX(${-(y / r.height) * 20}deg) rotateY(${(x / r.width) * 20}deg)`;
-  });
-  card.addEventListener("mouseleave", () => {
-    card.style.transform = "rotateX(0deg) rotateY(0deg)";
-  });
-});
+/* FLIP CAROUSEL */
+const items = [
+  "Item 1", "Item 2", "Item 3", "Item 4", "Item 5",
+  "Item 6", "Item 7", "Item 8", "Item 9"
+];
 
-/* CAROUSEL — PERFECT CENTER */
-const carousel = document.getElementById("carousel");
-const items = carousel.children;
-const total = items.length;
-let angle = 0;
-const step = 360 / total;
-const depth = 350; // FIXED depth = no drift
+let index = 0;
+let flipping = false;
 
-function positionItems() {
-  for (let i = 0; i < total; i++) {
-    const rotate = step * i;
-    items[i].style.transform = `rotateY(${rotate}deg) translateZ(${depth}px)`;
+const flipInner = document.getElementById("flipInner");
+const frontFace = document.getElementById("frontFace");
+const backFace = document.getElementById("backFace");
+
+function showItem(nextIndex, direction) {
+  if (flipping) return;
+  flipping = true;
+
+  const nextItem = items[nextIndex];
+
+  if (direction === "next") {
+    backFace.textContent = nextItem;
+    flipInner.style.transform = "rotateY(180deg)";
+  } else {
+    backFace.textContent = nextItem;
+    flipInner.style.transform = "rotateY(-180deg)";
   }
+
+  setTimeout(() => {
+    frontFace.textContent = nextItem;
+    flipInner.style.transform = "rotateY(0deg)";
+    flipping = false;
+  }, 800);
 }
 
-positionItems();
-
-/* ROTATION */
 document.getElementById("next").onclick = () => {
-  angle -= step;
-  carousel.style.transform = `translate(-50%, -50%) rotateY(${angle}deg)`;
+  index = (index + 1) % items.length;
+  showItem(index, "next");
 };
 
 document.getElementById("prev").onclick = () => {
-  angle += step;
-  carousel.style.transform = `translate(-50%, -50%) rotateY(${angle}deg)`;
+  index = (index - 1 + items.length) % items.length;
+  showItem(index, "prev");
 };
