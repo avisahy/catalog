@@ -1,7 +1,7 @@
 body {
   margin: 0;
-  background: #0d0d0d;
-  font-family: Arial, sans-serif;
+  background: linear-gradient(135deg, #1a1a2e, #16213e);
+  font-family: 'Segoe UI', Arial, sans-serif;
   color: #fff;
 }
 
@@ -9,35 +9,29 @@ body {
 .topbar {
   padding: 20px;
   text-align: center;
-  background: #111;
-  border-bottom: 1px solid #222;
+  background: linear-gradient(90deg, #4facfe, #8e44ad);
+  color: #fff;
+  text-shadow: 1px 1px 4px rgba(0,0,0,0.6);
 }
 
 .switcher button {
-  background: #222;
+  background: linear-gradient(90deg, #4facfe, #8e44ad);
   border: none;
   padding: 10px 18px;
   margin: 0 5px;
   color: #fff;
   border-radius: 8px;
   cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.switcher button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
 }
 
 .switcher .active {
-  background: #444;
-}
-
-/* FADE */
-.fade {
-  opacity: 1;
-  transition: opacity 0.5s ease;
-}
-
-.fade.hidden {
-  opacity: 0;
-  pointer-events: none;
-  position: absolute;
-  width: 100%;
+  background: linear-gradient(90deg, #ff6a00, #ee0979);
 }
 
 /* CATALOG GRID */
@@ -55,11 +49,18 @@ body {
 }
 
 .card {
-  background: #1a1a1a;
+  background: linear-gradient(135deg, #2c3e50, #34495e);
   border-radius: 16px;
   cursor: pointer;
   overflow: hidden;
-  border: 1px solid #333;
+  border: 1px solid #444;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.4);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 10px 24px rgba(0,0,0,0.6);
 }
 
 .card-image {
@@ -82,110 +83,48 @@ body {
   left: 50%;
   transform: translate(-50%, -50%);
   font-size: 16px;
-  color: #888;
+  font-weight: 600;
   text-transform: capitalize;
   pointer-events: none;
 }
 
-/* FLIP CAROUSEL */
-.flip-container {
-  width: 100%;
-  height: 70vh;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
+.card-image .placeholder-text {
+  color: #1abc9c; /* teal for Preview item */
 }
 
-.flip-card {
-  width: 260px;
-  height: 260px;
-  perspective: 1200px;
+#previewText.placeholder-text {
+  color: #f39c12; /* orange for No image to preview */
 }
 
-.flip-inner {
-  width: 100%;
-  height: 100%;
-  position: relative;
-  transform-style: preserve-3d;
-  transition: transform 0.6s ease;
-}
-
-.flip-face {
-  width: 100%;
-  height: 100%;
-  position: absolute;
-  backface-visibility: hidden;
-  background: #1a1a1a;
-  border-radius: 12px;
-  border: 1px solid #333;
-  overflow: hidden;
-}
-
-.flip-face img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.back {
-  transform: rotateY(180deg);
+#formPreviewText.placeholder-text {
+  color: #e91e63; /* pink for Add picture */
 }
 
 /* POPUP */
-.popup {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0,0,0,0.7);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 999;
-}
-
-.popup.hidden {
-  display: none;
-}
-
 .popup-content {
-  background: #1a1a1a;
+  background: linear-gradient(135deg, #2c3e50, #4b79a1);
   padding: 30px;
   border-radius: 12px;
   text-align: center;
-  width: 300px;
-  border: 1px solid #333;
-}
-
-.preview-img-wrapper {
-  position: relative;
-  width: 260px;
-  height: 260px;
-  margin: 0 auto 15px;
-  border-radius: 12px;
-  overflow: hidden;
-}
-
-.preview-img-wrapper img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.preview-img-wrapper.clickable {
-  cursor: pointer;
+  width: 320px;
+  border: 1px solid #555;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.6);
 }
 
 .popup-buttons button {
-  background: #222;
+  background: linear-gradient(90deg, #4facfe, #8e44ad);
   border: none;
   padding: 10px 18px;
   margin: 10px;
   color: #fff;
   border-radius: 8px;
   cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.popup-buttons button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
 }
 
 .close-btn {
@@ -204,17 +143,19 @@ body {
 }
 
 .remove-img-btn {
-  background: #aa0000;
+  background: linear-gradient(90deg, #ff6a00, #ee0979);
   border: none;
   padding: 8px 14px;
   border-radius: 8px;
   color: #fff;
   cursor: pointer;
   margin-bottom: 10px;
+  transition: transform 0.2s, box-shadow 0.2s;
 }
 
-.hidden {
-  display: none;
+.remove-img-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
 }
 
 /* FAB BUTTON */
@@ -222,13 +163,19 @@ body {
   position: fixed;
   bottom: 25px;
   right: 25px;
-  width: 60px;
-  height: 60px;
-  background: #ff0066;
+  width: 70px;
+  height: 70px;
+  background: linear-gradient(135deg, #ff6a00, #ee0979);
   border: none;
   border-radius: 50%;
-  font-size: 32px;
+  font-size: 36px;
   color: #fff;
   cursor: pointer;
-  box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+  box-shadow: 0 12px 28px rgba(0,0,0,0.6);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+#fab:hover {
+  transform: scale(1.1);
+  box-shadow: 0 16px 32px rgba(0,0,0,0.8);
 }
