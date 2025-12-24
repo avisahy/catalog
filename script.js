@@ -96,6 +96,15 @@ function openPreview(index) {
   popup.classList.remove("hidden");
 }
 
+/* Clicking + in preview opens Edit (ONLY if placeholder) */
+previewWrapper.onclick = () => {
+  const isPlaceholder = previewImage.src === PLACEHOLDER;
+  if (isPlaceholder) {
+    popup.classList.add("hidden");
+    openForm("edit");
+  }
+};
+
 document.getElementById("closePopup").onclick = () => {
   popup.classList.add("hidden");
 };
@@ -159,6 +168,9 @@ function openForm(mode) {
   formPopup.classList.remove("hidden");
 }
 
+/* Clicking the + opens file picker */
+formPreviewWrapper.onclick = () => itemImage.click();
+
 /* IMAGE UPLOAD */
 itemImage.onchange = () => {
   const file = itemImage.files[0];
@@ -190,7 +202,6 @@ document.getElementById("saveItem").onclick = () => {
     return;
   }
 
-  // If somehow src is empty, fallback to placeholder
   if (!image) image = PLACEHOLDER;
 
   if (formMode === "add") {
