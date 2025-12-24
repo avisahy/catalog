@@ -1,51 +1,29 @@
-// Demo catalog data
-const items = [
-  {
-    id: 1,
-    title: "Minimalist Chair",
-    description: "Clean lines, light frame, perfect for modern spaces.",
-    price: "$89",
-    image: "https://images.pexels.com/photos/116910/pexels-photo-116910.jpeg?auto=compress&w=640"
-  },
-  {
-    id: 2,
-    title: "Wooden Desk",
-    description: "Solid wood desk for work, study, or creativity.",
-    price: "$149",
-    image: "https://images.pexels.com/photos/159839/desk-notebook-office-pen-159839.jpeg?auto=compress&w=640"
-  },
-  {
-    id: 3,
-    title: "Cozy Lamp",
-    description: "Warm lighting to make any room feel calm.",
-    price: "$39",
-    image: "https://images.pexels.com/photos/1242348/pexels-photo-1242348.jpeg?auto=compress&w=640"
-  },
-  {
-    id: 4,
-    title: "Wall Art Print",
-    description: "Abstract art print to add character to your walls.",
-    price: "$29",
-    image: "https://images.pexels.com/photos/276583/pexels-photo-276583.jpeg?auto=compress&w=640"
-  }
-];
-
+let items = [];
 const catalogEl = document.getElementById("catalog");
 const template = document.getElementById("itemTemplate");
 const searchInput = document.getElementById("searchInput");
 
-// Render items
+/* ---------------------------
+   LOAD DATABASE + LOCAL ITEMS
+---------------------------- */
+async function loadItems() {
+  const db = await fetch("database.json").then(r => r.json());
+  const local = JSON.parse(localStorage.getItem("items") || "[]");
+  items = [...db, ...local];
+  renderItems(items);
+}
+
+/* ---------------------------
+   RENDER ITEMS
+---------------------------- */
 function renderItems(list) {
   catalogEl.innerHTML = "";
-  list.forEach((item) => {
+  list.forEach(item => {
     const node = template.content.cloneNode(true);
     const img = node.querySelector(".item-image");
 
     img.src = item.image;
     img.alt = item.title;
-
-    // Remove body (image-only cards)
-    node.querySelector(".item-body").remove();
 
     img.addEventListener("click", () => openModal(item));
 
@@ -53,21 +31,21 @@ function renderItems(list) {
   });
 }
 
-// Search filter
-function filterItems(query) {
-  const q = query.trim().toLowerCase();
-  if (!q) return items;
-  return items.filter((item) =>
-    item.title.toLowerCase().includes(q) ||
-    item.description.toLowerCase().includes(q)
+/* ---------------------------
+   SEARCH
+---------------------------- */
+searchInput.addEventListener("input", e => {
+  const q = e.target.value.toLowerCase();
+  const filtered = items.filter(i =>
+    i.title.toLowerCase().includes(q) ||
+    i.description.toLowerCase().includes(q)
   );
-}
-
-searchInput.addEventListener("input", (e) => {
-  renderItems(filterItems(e.target.value));
+  renderItems(filtered);
 });
 
-// Modal logic
+/* ---------------------------
+   ITEM DETAILS MODAL
+---------------------------- */
 const modal = document.getElementById("modal");
 const modalImage = document.getElementById("modalImage");
 const modalTitle = document.getElementById("modalTitle");
@@ -83,10 +61,75 @@ function openModal(item) {
   modal.classList.remove("hidden");
 }
 
-modalClose.addEventListener("click", () => modal.classList.add("hidden"));
-modal.addEventListener("click", (e) => {
-  if (e.target === modal) modal.classList.add("hidden");
-});
+modalClose.onclick = () => modal.classList.add("hidden");
+modal.onclick = e => { if (e.target === modal) modal.classList.add("hidden") };
 
-// Initial render
-renderItems(items);
+/* ---------------------------
+   DARK / LIGHT MODE
+---------------------------- */
+const themeToggle = document.getElementById("themeToggle");
+
+function applyTheme() {
+  const mode = localStorage.getItem("theme") || "light";
+  document.body.classList.toggle("dark", mode === "dark");
+  themeToggle.textContent = mode === "dark" ? "☀️" : "🌙";
+}
+
+themeToggle.onclick = () => {
+  const mode = document.body.classList.contains("dark") ? "light" : "dark";
+  localStorage.setItem("theme", mode);
+  applyTheme();
+};
+
+applyTheme();
+
+/* ---------------------------
+   ADD ITEM MODAL
+---------------------------- */
+const addButton = document.getElementById("addButton");
+const addModal = document.getElementById("addModal");
+const addClose = document.getElementById("addClose");
+
+addButton.onclick = () => addModal.classList.remove("hidden");
+addClose.onclick = () => addModal.classList.add("hidden");
+addModal.onclick = e => { if (e.target === addModal) addModal.classList.add("hidden") };
+
+/* ---------------------------
+   SAVE NEW ITEM
+---------------------------- */
+document.getElementById("saveItem").onclick = () => {
+  const title = document.getElementById("newTitle").value.trim();
+  const description = document.getElementById("newDescription").value.trim();
+  const price = document.getElementById("newPrice").value.trim();
+  const file = document.getElementById("newImage").files[0];
+
+  if (!title || !description || !price || !file) {
+    alert("Please fill all fields");
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    const newItem = {
+      id: Date.now(),
+      title,
+      description,
+      price,
+      image: reader.result
+    };
+
+    const local = JSON.parse(localStorage.getItem("items") || "[]");
+    local.push(newItem);
+    localStorage.setItem("items", JSON.stringify(local));
+
+    addModal.classList.add("hidden");
+    loadItems();
+  };
+
+  reader.readAsDataURL(file);
+};
+
+/* ---------------------------
+   INIT
+---------------------------- */
+loadItems();
