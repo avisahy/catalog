@@ -194,3 +194,10 @@ form textarea {
 #removeImageBtn {
     width: 100%;
 }
+
+/* Empty state */
+.empty-state {
+    text-align: center;
+    padding: 40px;
+    color: var(--muted);
+}
