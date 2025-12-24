@@ -50,14 +50,12 @@ const modal = document.getElementById("modal");
 const modalImage = document.getElementById("modalImage");
 const modalTitle = document.getElementById("modalTitle");
 const modalDescription = document.getElementById("modalDescription");
-const modalPrice = document.getElementById("modalPrice");
 const modalClose = document.getElementById("modalClose");
 
 function openModal(item) {
   modalImage.src = item.image;
   modalTitle.textContent = item.title;
   modalDescription.textContent = item.description;
-  modalPrice.textContent = item.price;
   modal.classList.remove("hidden");
 }
 
@@ -95,15 +93,35 @@ addClose.onclick = () => addModal.classList.add("hidden");
 addModal.onclick = e => { if (e.target === addModal) addModal.classList.add("hidden") };
 
 /* ---------------------------
+   IMAGE PICKER + PREVIEW
+---------------------------- */
+const pickImage = document.getElementById("pickImage");
+const newImage = document.getElementById("newImage");
+const previewImage = document.getElementById("previewImage");
+
+pickImage.onclick = () => newImage.click();
+
+newImage.onchange = () => {
+  const file = newImage.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    previewImage.src = reader.result;
+    previewImage.classList.remove("hidden");
+  };
+  reader.readAsDataURL(file);
+};
+
+/* ---------------------------
    SAVE NEW ITEM
 ---------------------------- */
 document.getElementById("saveItem").onclick = () => {
   const title = document.getElementById("newTitle").value.trim();
   const description = document.getElementById("newDescription").value.trim();
-  const price = document.getElementById("newPrice").value.trim();
-  const file = document.getElementById("newImage").files[0];
+  const file = newImage.files[0];
 
-  if (!title || !description || !price || !file) {
+  if (!title || !description || !file) {
     alert("Please fill all fields");
     return;
   }
@@ -114,7 +132,6 @@ document.getElementById("saveItem").onclick = () => {
       id: Date.now(),
       title,
       description,
-      price,
       image: reader.result
     };
 
