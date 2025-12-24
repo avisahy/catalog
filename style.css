@@ -40,12 +40,19 @@ body {
   width: 100%;
 }
 
-/* CATALOG */
+/* CATALOG — ALWAYS 4 ITEMS PER ROW */
 .catalog {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 30px;
   padding: 40px;
+}
+
+/* MOBILE — 2 ITEMS PER ROW */
+@media (max-width: 600px) {
+  .catalog {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 .card {
@@ -99,10 +106,6 @@ body {
   background: #1a1a1a;
   border-radius: 12px;
   border: 1px solid #333;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  font-size: 26px;
   overflow: hidden;
 }
 
