@@ -72,13 +72,14 @@ function renderForm(mode, id = null) {
                 <input name="name" placeholder="Name" value="${item.name}" required>
 
                 <div class="image-field">
-                    <label class="image-upload-area" id="uploadArea">
-                        <span id="uploadPlus" ${item.imageData ? 'style="display:none;"' : ''}>+</span>
-                        <img id="imagePreview" class="image-preview" 
-                             src="${item.imageData}" 
+                    <div class="image-upload-area" id="uploadArea">
+                        <span id="uploadPlus" style="${item.imageData ? 'display:none;' : ''}">+</span>
+                        <img id="imagePreview" class="image-preview"
+                             src="${item.imageData}"
                              style="${item.imageData ? '' : 'display:none;'}">
-                        <input name="imageFile" type="file" accept="image/*" style="display:none;">
-                    </label>
+                    </div>
+
+                    <input name="imageFile" id="imageFile" type="file" accept="image/*" style="display:none;">
 
                     <button type="button" id="removeImageBtn" class="btn btn-outline"
                         style="${item.imageData ? '' : 'display:none;'}">
@@ -91,19 +92,17 @@ function renderForm(mode, id = null) {
         </div>
     `;
 
-    const fileInput = document.querySelector("input[name='imageFile']");
+    const fileInput = document.getElementById("imageFile");
+    const uploadArea = document.getElementById("uploadArea");
     const preview = document.getElementById("imagePreview");
     const uploadPlus = document.getElementById("uploadPlus");
     const removeBtn = document.getElementById("removeImageBtn");
-    const uploadArea = document.getElementById("uploadArea");
 
     let currentImageData = item.imageData || "";
 
-    uploadArea.addEventListener("click", (e) => {
-    e.preventDefault();      // stop double-trigger
-    fileInput.click();       // open gallery once
+    uploadArea.addEventListener("click", () => {
+        fileInput.click();
     });
-
 
     fileInput.addEventListener("change", e => {
         const file = e.target.files[0];
