@@ -18,23 +18,14 @@
   </header>
 
   <!-- 3D CATALOG UI -->
-  <main id="catalogUI" class="catalog fade">
-    <div class="card"><div class="card-inner"><h2>Item 1</h2></div></div>
-    <div class="card"><div class="card-inner"><h2>Item 2</h2></div></div>
-    <div class="card"><div class="card-inner"><h2>Item 3</h2></div></div>
-    <div class="card"><div class="card-inner"><h2>Item 4</h2></div></div>
-    <div class="card"><div class="card-inner"><h2>Item 5</h2></div></div>
-    <div class="card"><div class="card-inner"><h2>Item 6</h2></div></div>
-    <div class="card"><div class="card-inner"><h2>Item 7</h2></div></div>
-    <div class="card"><div class="card-inner"><h2>Item 8</h2></div></div>
-  </main>
+  <main id="catalogUI" class="catalog fade"></main>
 
   <!-- 3D FLIP CAROUSEL -->
   <main id="carouselUI" class="flip-container fade hidden">
     <div class="flip-card">
       <div class="flip-inner" id="flipInner">
-        <div class="flip-face front" id="frontFace">Item 1</div>
-        <div class="flip-face back" id="backFace">Item 2</div>
+        <div class="flip-face front" id="frontFace"></div>
+        <div class="flip-face back" id="backFace"></div>
       </div>
     </div>
 
@@ -47,6 +38,7 @@
   <!-- ITEM PREVIEW POPUP -->
   <div id="previewPopup" class="popup hidden">
     <div class="popup-content">
+      <img id="previewImage" class="popup-img" />
       <h2 id="previewTitle"></h2>
 
       <div class="popup-buttons">
@@ -58,7 +50,30 @@
     </div>
   </div>
 
+  <!-- ADD / EDIT ITEM FORM -->
+  <div id="itemForm" class="popup hidden">
+    <div class="popup-content">
+      <h2 id="formTitle">Add Item</h2>
+
+      <input id="itemName" type="text" placeholder="Item Title" />
+
+      <label class="img-upload">
+        <input id="itemImage" type="file" accept="image/*" />
+        Upload Image
+      </label>
+
+      <img id="imagePreview" class="preview-square hidden" />
+
+      <div class="popup-buttons">
+        <button id="saveItem">Save</button>
+        <button id="cancelItem">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FAB BUTTON -->
+  <button id="fab">+</button>
+
   <script src="script.js"></script>
 </body>
 </html>
-
