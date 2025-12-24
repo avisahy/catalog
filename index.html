@@ -2,16 +2,18 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Catalog PWA</title>
+  <title>Catalog App</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
 
   <header class="topbar">
     <h1 class="app-title">Catalog</h1>
-    <input id="searchInput" type="search" placeholder="Search items..." class="search-input" />
+
+    <button id="themeToggle" class="theme-toggle">🌙</button>
+
+    <input id="searchInput" type="search" placeholder="Search..." class="search-input" />
   </header>
 
   <main class="catalog-container" id="catalog"></main>
@@ -20,11 +22,10 @@
   <template id="itemTemplate">
     <article class="item-card">
       <img class="item-image" alt="" />
-      <div class="item-body"></div>
     </article>
   </template>
 
-  <!-- Modal -->
+  <!-- Item Details Modal -->
   <div id="modal" class="modal hidden">
     <div class="modal-content">
       <button id="modalClose" class="modal-close">✕</button>
@@ -34,6 +35,25 @@
       <p id="modalPrice" class="modal-price"></p>
     </div>
   </div>
+
+  <!-- Add Item Modal -->
+  <div id="addModal" class="modal hidden">
+    <div class="modal-content">
+      <button id="addClose" class="modal-close">✕</button>
+      <h2>Add New Item</h2>
+
+      <input id="newTitle" class="input" placeholder="Title" />
+      <textarea id="newDescription" class="input" placeholder="Description"></textarea>
+      <input id="newPrice" class="input" placeholder="Price" />
+
+      <input id="newImage" type="file" accept="image/*" capture="environment" />
+
+      <button id="saveItem" class="save-btn">Save Item</button>
+    </div>
+  </div>
+
+  <!-- Add Item Floating Button -->
+  <button id="addButton" class="add-button">＋</button>
 
   <script src="app.js"></script>
 </body>
