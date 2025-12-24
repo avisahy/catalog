@@ -3,38 +3,60 @@ body {
   background: #0d0d0d;
   font-family: Arial, sans-serif;
   color: #fff;
-  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100vh;
+  overflow: hidden;
 }
 
-.topbar {
-  padding: 20px;
-  text-align: center;
-  background: #111;
-  border-bottom: 1px solid #222;
-}
-
-.catalog {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 30px;
-  padding: 40px;
+.carousel-container {
+  width: 100%;
+  height: 60vh;
   perspective: 1200px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
-.card {
-  background: #1a1a1a;
-  border-radius: 16px;
-  height: 220px;
+.carousel {
+  width: 300px;
+  height: 300px;
+  position: relative;
   transform-style: preserve-3d;
-  transition: transform 0.2s ease-out;
+  transition: transform 1s;
+}
+
+.item {
+  position: absolute;
+  width: 180px;
+  height: 120px;
+  background: #1a1a1a;
+  border-radius: 12px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 22px;
+  border: 1px solid #333;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+}
+
+.controls {
+  margin-top: 20px;
+}
+
+button {
+  background: #222;
+  border: none;
+  padding: 12px 20px;
+  margin: 0 10px;
+  color: #fff;
+  font-size: 18px;
+  border-radius: 8px;
   cursor: pointer;
+  transition: 0.2s;
 }
 
-.card-inner {
-  padding: 20px;
-  transform: translateZ(40px);
-}
-
-.card:hover {
-  box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+button:hover {
+  background: #444;
 }
