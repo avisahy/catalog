@@ -7,19 +7,29 @@
 
     <link rel="stylesheet" href="css/styles.css">
     <link rel="manifest" href="manifest.webmanifest">
-    <meta name="theme-color" content="#1a73e8">
+    <meta name="theme-color" content="#111827">
 </head>
 
 <body>
-    <header>
-        <h1>Catalog</h1>
-        <input id="searchInput" type="text" placeholder="Search items...">
-        <select id="categoryFilter"></select>
+    <header class="app-header">
+        <div class="logo-area">
+            <h1>Catalog</h1>
+            <span class="tagline">Your items, organized beautifully</span>
+        </div>
+
+        <div class="controls-row">
+            <input id="searchInput" type="text" placeholder="Search items...">
+            <select id="categoryFilter"></select>
+
+            <button id="themeToggle" class="icon-btn" title="Toggle dark mode">
+                🌙
+            </button>
+        </div>
     </header>
 
-    <main id="app"></main>
+    <main id="app" class="app-main"></main>
 
-    <button id="addBtn">+</button>
+    <button id="addBtn" class="fab" title="Add item">+</button>
 
     <script src="js/sample-data.js"></script>
     <script src="js/storage.js"></script>
