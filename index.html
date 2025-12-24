@@ -32,7 +32,6 @@
       <img id="modalImage" class="modal-image" />
       <h2 id="modalTitle"></h2>
       <p id="modalDescription"></p>
-      <p id="modalPrice" class="modal-price"></p>
     </div>
   </div>
 
@@ -44,9 +43,11 @@
 
       <input id="newTitle" class="input" placeholder="Title" />
       <textarea id="newDescription" class="input" placeholder="Description"></textarea>
-      <input id="newPrice" class="input" placeholder="Price" />
 
-      <input id="newImage" type="file" accept="image/*" capture="environment" />
+      <button id="pickImage" class="pick-btn">Add Picture</button>
+      <input id="newImage" type="file" accept="image/*" capture="environment" style="display:none" />
+
+      <img id="previewImage" class="preview hidden" />
 
       <button id="saveItem" class="save-btn">Save Item</button>
     </div>
