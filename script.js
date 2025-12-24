@@ -1,4 +1,3 @@
-// Simple localStorage-based catalog with image data URLs
 const STORAGE_KEY = "catalog_items_v1";
 const THEME_KEY = "catalog_theme";
 
@@ -8,7 +7,6 @@ let deferredInstallPrompt = null;
 // DOM elements
 const catalogList = document.getElementById("catalogList");
 const emptyState = document.getElementById("emptyState");
-const addItemButton = document.getElementById("addItemButton");
 const itemModalBackdrop = document.getElementById("itemModalBackdrop");
 const detailModalBackdrop = document.getElementById("detailModalBackdrop");
 const closeModalButton = document.getElementById("closeModalButton");
@@ -26,6 +24,8 @@ const deleteButton = document.getElementById("deleteButton");
 const editButton = document.getElementById("editButton");
 const themeToggle = document.getElementById("themeToggle");
 const installButton = document.getElementById("installButton");
+const fabAdd = document.getElementById("fabAdd");
+const searchInput = document.getElementById("searchInput");
 
 // ---- Storage helpers ----
 
@@ -65,15 +65,17 @@ function initTheme() {
 
 // ---- UI rendering ----
 
-function renderCatalog() {
+function renderCatalog(list = items) {
   catalogList.innerHTML = "";
-  if (!items.length) {
+
+  if (!list.length) {
     emptyState.hidden = false;
     return;
   }
+
   emptyState.hidden = true;
 
-  items
+  list
     .slice()
     .sort((a, b) => b.createdAt - a.createdAt)
     .forEach((item) => {
@@ -89,19 +91,22 @@ function renderCatalog() {
       imageWrapper.className = "catalog-card-image-wrapper";
 
       const img = document.createElement("img");
-      img.className = "catalog-card-image";
+      img.className = "catalog-card-image zoomable";
       img.src = item.imageDataUrl;
       img.alt = item.name || "Catalog item";
 
+      // Zoom on card image
+      img.addEventListener("click", (event) => {
+        event.stopPropagation(); // don't open detail when zooming
+        img.classList.toggle("zoomed");
+      });
+
+      imageWrapper.appendChild(img);
+
+      // body exists but is hidden (we only show picture on main screen)
       const body = document.createElement("div");
       body.className = "catalog-card-body";
 
-      const nameEl = document.createElement("p");
-      nameEl.className = "catalog-card-name";
-      nameEl.textContent = item.name || "Untitled item";
-
-      imageWrapper.appendChild(img);
-      body.appendChild(nameEl);
       button.appendChild(imageWrapper);
       button.appendChild(body);
       card.appendChild(button);
@@ -155,6 +160,12 @@ function openDetailModal(id) {
   img.src = item.imageDataUrl;
   img.alt = item.name || "Catalog item";
 
+  // Zoom in detail view as well
+  img.classList.add("zoomable");
+  img.addEventListener("click", () => {
+    img.classList.toggle("zoomed");
+  });
+
   imageWrapper.appendChild(img);
 
   const nameEl = document.createElement("p");
@@ -194,7 +205,8 @@ function readFileAsDataUrl(file) {
 
 // ---- Event handlers ----
 
-addItemButton.addEventListener("click", () => openItemModal("add"));
+// FAB add item
+fabAdd.addEventListener("click", () => openItemModal("add"));
 
 closeModalButton.addEventListener("click", closeItemModal);
 cancelButton.addEventListener("click", closeItemModal);
@@ -237,6 +249,15 @@ itemImageInput.addEventListener("change", async () => {
   }
 });
 
+// Search
+searchInput.addEventListener("input", (event) => {
+  const q = event.target.value.toLowerCase();
+  const filtered = items.filter((i) =>
+    (i.name || "").toLowerCase().includes(q)
+  );
+  renderCatalog(filtered);
+});
+
 // Add/edit submit
 itemForm.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -248,7 +269,7 @@ itemForm.addEventListener("submit", async (event) => {
 
   if (!name) {
     formError.textContent = "Please enter a name.";
-    formError.hidden = false;
+    formError.hidden = true; // stays silent; you could also show this
     return;
   }
 
@@ -260,6 +281,9 @@ itemForm.addEventListener("submit", async (event) => {
   if (!file && !existing) {
     formError.textContent = "Please select a picture.";
     formError.hidden = false;
+    setTimeout(() => {
+      formError.hidden = true;
+    }, 5000);
     return;
   }
   if (file) {
@@ -269,6 +293,9 @@ itemForm.addEventListener("submit", async (event) => {
       console.error(err);
       formError.textContent = "Failed to read image. Please try again.";
       formError.hidden = false;
+      setTimeout(() => {
+        formError.hidden = true;
+      }, 5000);
       return;
     }
   }
