@@ -1,4 +1,10 @@
 /* -------------------------
+   PLACEHOLDER IMAGE
+-------------------------- */
+const PLACEHOLDER =
+"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
+
+/* -------------------------
    LOCAL STORAGE SYSTEM
 -------------------------- */
 function loadItems() {
@@ -17,21 +23,16 @@ let items = loadItems();
 const catalogUI = document.getElementById("catalogUI");
 const carouselUI = document.getElementById("carouselUI");
 
-const btnCatalog = document.getElementById("btnCatalog");
-const btnCarousel = document.getElementById("btnCarousel");
-
-btnCatalog.onclick = () => {
+document.getElementById("btnCatalog").onclick = () => {
   btnCatalog.classList.add("active");
   btnCarousel.classList.remove("active");
-
   catalogUI.classList.remove("hidden");
   carouselUI.classList.add("hidden");
 };
 
-btnCarousel.onclick = () => {
+document.getElementById("btnCarousel").onclick = () => {
   btnCarousel.classList.add("active");
   btnCatalog.classList.remove("active");
-
   carouselUI.classList.remove("hidden");
   catalogUI.classList.add("hidden");
 };
@@ -48,7 +49,7 @@ function renderCatalog() {
     card.dataset.index = index;
 
     card.innerHTML = `
-      <img src="${item.image || ""}" />
+      <img src="${item.image || PLACEHOLDER}" />
       <div class="card-inner"><h2>${item.title}</h2></div>
     `;
 
@@ -73,7 +74,7 @@ function openPreview(index) {
   const item = items[index];
 
   previewTitle.textContent = item.title;
-  previewImage.src = item.image;
+  previewImage.src = item.image || PLACEHOLDER;
 
   popup.classList.remove("hidden");
 }
@@ -104,6 +105,7 @@ const formTitle = document.getElementById("formTitle");
 const itemName = document.getElementById("itemName");
 const itemImage = document.getElementById("itemImage");
 const imagePreview = document.getElementById("imagePreview");
+const removeImageBtn = document.getElementById("removeImage");
 
 let formMode = "add";
 
@@ -115,14 +117,16 @@ function openForm(mode) {
   if (mode === "add") {
     formTitle.textContent = "Add Item";
     itemName.value = "";
-    imagePreview.classList.add("hidden");
-    imagePreview.src = "";
+    imagePreview.src = PLACEHOLDER;
+    imagePreview.classList.remove("hidden");
+    removeImageBtn.classList.add("hidden");
   } else {
     formTitle.textContent = "Edit Item";
     const item = items[selectedIndex];
     itemName.value = item.title;
-    imagePreview.src = item.image;
+    imagePreview.src = item.image || PLACEHOLDER;
     imagePreview.classList.remove("hidden");
+    removeImageBtn.classList.remove("hidden");
   }
 
   formPopup.classList.remove("hidden");
@@ -136,18 +140,23 @@ itemImage.onchange = () => {
   const reader = new FileReader();
   reader.onload = e => {
     imagePreview.src = e.target.result;
-    imagePreview.classList.remove("hidden");
+    removeImageBtn.classList.remove("hidden");
   };
   reader.readAsDataURL(file);
+};
+
+/* REMOVE IMAGE */
+removeImageBtn.onclick = () => {
+  imagePreview.src = PLACEHOLDER;
 };
 
 /* SAVE ITEM */
 document.getElementById("saveItem").onclick = () => {
   const title = itemName.value.trim();
-  const image = imagePreview.src || "";
+  const image = imagePreview.src || PLACEHOLDER;
 
-  if (!title || !image) {
-    alert("Please enter a title and upload an image.");
+  if (!title) {
+    alert("Please enter a title.");
     return;
   }
 
@@ -185,7 +194,7 @@ function updateCarouselFaces() {
   }
 
   const item = items[flipIndex];
-  frontFace.innerHTML = `<img src="${item.image}" />`;
+  frontFace.innerHTML = `<img src="${item.image || PLACEHOLDER}" />`;
 }
 
 updateCarouselFaces();
@@ -195,7 +204,7 @@ function flipTo(nextIndex, direction) {
   flipping = true;
 
   const nextItem = items[nextIndex];
-  backFace.innerHTML = `<img src="${nextItem.image}" />`;
+  backFace.innerHTML = `<img src="${nextItem.image || PLACEHOLDER}" />`;
 
   flipInner.style.transform =
     direction === "next" ? "rotateY(180deg)" : "rotateY(-180deg)";
