@@ -39,6 +39,8 @@ body {
   background: var(--bg);
   color: var(--text);
   transition: background var(--transition), color var(--transition);
+  position: relative;
+  min-height: 100vh;
 }
 
 .app {
@@ -108,7 +110,14 @@ body {
 -------------------------------------------------- */
 .grid {
   display: grid;
+  grid-template-columns: 1fr;
   gap: 16px;
+}
+
+@media (min-width: 480px) {
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 .empty-state {
@@ -184,6 +193,8 @@ body {
 }
 
 .modal {
+  display: flex;
+  flex-direction: column;
   width: 100%;
   max-width: 420px;
   background: var(--bg);
@@ -226,10 +237,14 @@ body {
 /* --------------------------------------------------
    FORM FIELDS
 -------------------------------------------------- */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .field-label {
   font-size: 14px;
-  margin-bottom: 6px;
-  display: block;
 }
 
 .field input[type="text"] {
@@ -302,7 +317,7 @@ body {
 }
 
 /* --------------------------------------------------
-   TOOLTIP (fade in/out)
+   TOOLTIP
 -------------------------------------------------- */
 .form-error {
   color: var(--danger);
@@ -338,13 +353,4 @@ body {
 .zoom-slider {
   width: 80%;
   margin-top: 20px;
-}
-
-/* --------------------------------------------------
-   RESPONSIVE
--------------------------------------------------- */
-@media (min-width: 480px) {
-  .grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
 }
