@@ -74,7 +74,9 @@ body {
   justify-content: center;
   align-items: center;
   padding-top: 80px;
+  position: relative;
 }
+
 
 .carousel {
   width: 300px;
@@ -82,6 +84,8 @@ body {
   position: relative;
   transform-style: preserve-3d;
   transition: transform 1s;
+  transform-origin: center center;
+  margin: 0 auto;
 }
 
 .item {
