@@ -88,11 +88,6 @@ body {
   pointer-events: none;
 }
 
-.card-inner {
-  padding: 15px;
-  text-align: center;
-}
-
 /* FLIP CAROUSEL */
 .flip-container {
   width: 100%;
