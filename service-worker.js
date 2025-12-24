@@ -1,24 +1,53 @@
-const CACHE_NAME = "catalog-cache-v1";
-const FILES = [
-    "/",
-    "/index.html",
-    "/css/styles.css",
-    "/js/app.js",
-    "/js/router.js",
-    "/js/storage.js",
-    "/js/views.js",
-    "/js/sample-data.js",
-    "/assets/placeholder.png"
+const CACHE_NAME = "catalog-pwa-v1";
+const ASSETS = [
+  "./",
+  "./index.html",
+  "./styles.css",
+  "./script.js",
+  "./manifest.json",
+  "./icon-192.svg",
+  "./icon-512.svg"
 ];
 
-self.addEventListener("install", e => {
-    e.waitUntil(
-        caches.open(CACHE_NAME).then(cache => cache.addAll(FILES))
-    );
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.addAll(ASSETS);
+    })
+  );
+  self.skipWaiting();
 });
 
-self.addEventListener("fetch", e => {
-    e.respondWith(
-        caches.match(e.request).then(res => res || fetch(e.request))
-    );
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(
+        keys
+          .filter((key) => key !== CACHE_NAME)
+          .map((key) => caches.delete(key))
+      )
+    )
+  );
+  self.clients.claim();
+});
+
+self.addEventListener("fetch", (event) => {
+  const { request } = event;
+
+  if (request.method !== "GET") return;
+
+  event.respondWith(
+    caches.match(request).then((cached) => {
+      if (cached) return cached;
+      return fetch(request)
+        .then((response) => {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(request, copy);
+          });
+          return response;
+        })
+        .catch(() => cached || Promise.reject("no-match"));
+    })
+  );
 });
