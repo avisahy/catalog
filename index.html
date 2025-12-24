@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Catalog SaaS PWA</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#111827">
+  <link rel="icon" href="icons/icon-192.png" type="image/png">
+
+  <!-- Tailwind (CDN for prototype) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Accessible focus styles -->
+  <style>
+    :focus { outline: 3px solid #60A5FA; outline-offset: 2px; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+    /* Dark mode base when html has class 'dark' */
+    html.dark { color-scheme: dark; }
+  </style>
+</head>
+<body class="h-full bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+  <div id="app" class="min-h-screen flex flex-col">
+
+    <!-- Top bar -->
+    <header class="w-full border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950">
+      <nav class="mx-auto max-w-5xl px-4 py-3 flex items-center justify-between" aria-label="Main navigation">
+        <div class="flex items-center gap-3">
+          <img src="icons/icon-192.png" alt="" class="w-8 h-8 rounded" />
+          <h1 class="text-lg font-semibold">Catalog SaaS</h1>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <label class="flex items-center gap-2" aria-label="Toggle dark mode">
+            <span class="text-sm">Dark</span>
+            <input id="themeToggle" type="checkbox" class="w-5 h-5" />
+          </label>
+
+          <button id="installBtn" class="px-3 py-1 text-sm rounded bg-indigo-600 text-white hover:bg-indigo-700" aria-label="Install app">
+            Install
+          </button>
+
+          <button id="notifyBtn" class="px-3 py-1 text-sm rounded bg-amber-600 text-white hover:bg-amber-700" aria-label="Enable notifications">
+            Notifications
+          </button>
+
+          <button id="logoutBtn" class="px-3 py-1 text-sm rounded bg-gray-200 dark:bg-gray-800" aria-label="Logout">
+            Logout
+          </button>
+        </div>
+      </nav>
+    </header>
+
+    <!-- Auth screen -->
+    <main id="authScreen" class="flex-1 grid place-items-center">
+      <section class="w-full max-w-md bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg p-6">
+        <h2 class="text-xl font-medium mb-4">Sign in</h2>
+
+        <form id="loginForm" class="space-y-3" aria-label="Email login form">
+          <div>
+            <label for="email" class="block text-sm mb-1">Email</label>
+            <input id="email" name="email" type="email" required class="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900" />
+          </div>
+          <div>
+            <label for="password" class="block text-sm mb-1">Password</label>
+            <input id="password" name="password" type="password" required class="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900" />
+          </div>
+
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <label for="role" class="text-sm">Role</label>
+              <select id="role" class="px-2 py-1 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900">
+                <option value="user">Standard User</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <label for="tenant" class="text-sm">Tenant</label>
+              <select id="tenant" class="px-2 py-1 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900">
+                <option value="tenant-a">Tenant A</option>
+                <option value="tenant-b">Tenant B</option>
+              </select>
+            </div>
+          </div>
+
+          <button type="submit" class="w-full px-3 py-2 rounded bg-indigo-600 text-white hover:bg-indigo-700">Sign in</button>
+        </form>
+
+        <div class="mt-4">
+          <p class="text-sm mb-2">Or continue with:</p>
+          <div class="flex gap-2">
+            <button id="googleBtn" class="flex-1 px-3 py-2 rounded border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800" aria-label="Sign in with Google">Google</button>
+            <button id="microsoftBtn" class="flex-1 px-3 py-2 rounded border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800" aria-label="Sign in with Microsoft">Microsoft</button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Dashboard -->
+    <section id="dashboard" class="hidden flex-1 mx-auto max-w-5xl w-full px-4 py-6">
+      <div class="flex flex-col gap-6 w-full">
+
+        <!-- SaaS banner -->
+        <div class="flex items-center justify-between bg-indigo-50 dark:bg-indigo-950 border border-indigo-200 dark:border-indigo-800 p-4 rounded">
+          <div>
+            <p class="text-sm">Current plan: <span id="planLabel" class="font-medium">Free</span></p>
+            <p class="text-xs opacity-80">Usage: <span id="usageLabel">0</span>/<span id="usageLimitLabel">50</span> items</p>
+          </div>
+          <div class="flex gap-2">
+            <button id="upgradeBtn" class="px-3 py-1 rounded bg-indigo-600 text-white hover:bg-indigo-700">Upgrade</button>
+            <button id="manageBillingBtn" class="px-3 py-1 rounded border border-indigo-300 dark:border-indigo-700">Manage billing</button>
+          </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="grid gap-3 md:grid-cols-3">
+          <div class="md:col-span-2 flex gap-2">
+            <input id="searchInput" type="search" placeholder="Search items..." class="flex-1 px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900" aria-label="Search items" />
+            <select id="categoryFilter" class="px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900" aria-label="Filter by category">
+              <option value="">All categories</option>
+              <option>Books</option>
+              <option>Electronics</option>
+              <option>Clothing</option>
+            </select>
+            <select id="tagFilter" class="px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900" aria-label="Filter by tag">
+              <option value="">All tags</option>
+              <option>New</option>
+              <option>Used</option>
+              <option>Featured</option>
+            </select>
+          </div>
+          <div class="flex justify-end">
+            <button id="addItemBtn" class="px-3 py-2 rounded bg-green-600 text-white hover:bg-green-700">Add item</button>
+          </div>
+        </div>
+
+        <!-- Items list -->
+        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" id="itemsGrid" aria-live="polite" aria-busy="false"></div>
+
+        <!-- Pagination -->
+        <div class="flex items-center justify-center gap-2">
+          <button id="prevPageBtn" class="px-3 py-1 rounded border border-gray-300 dark:border-gray-700">Prev</button>
+          <span id="pageLabel" class="text-sm"></span>
+          <button id="nextPageBtn" class="px-3 py-1 rounded border border-gray-300 dark:border-gray-700">Next</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Add/Edit modal -->
+    <dialog id="itemModal" class="rounded-lg w-full max-w-lg backdrop:bg-black/50">
+      <form id="itemForm" class="bg-white dark:bg-gray-950 p-6 rounded-lg space-y-3" method="dialog">
+        <h3 id="modalTitle" class="text-lg font-medium">Add item</h3>
+        <input type="hidden" id="itemId">
+        <div>
+          <label for="itemTitle" class="block text-sm mb-1">Title</label>
+          <input id="itemTitle" required class="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900" />
+        </div>
+        <div>
+          <label for="itemDesc" class="block text-sm mb-1">Description</label>
+          <textarea id="itemDesc" rows="3" class="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900"></textarea>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label for="itemCat" class="block text-sm mb-1">Category</label>
+            <select id="itemCat" class="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900">
+              <option>Books</option>
+              <option>Electronics</option>
+              <option>Clothing</option>
+            </select>
+          </div>
+          <div>
+            <label for="itemTags" class="block text-sm mb-1">Tags (comma-separated)</label>
+            <input id="itemTags" class="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900" placeholder="New,Featured" />
+          </div>
+        </div>
+        <div>
+          <label for="itemImage" class="block text-sm mb-1">Image</label>
+          <input id="itemImage" type="file" accept="image/*" class="block w-full text-sm" />
+          <p class="text-xs opacity-70 mt-1">Images are stored locally in this prototype.</p>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2">
+          <button id="cancelModalBtn" type="button" class="px-3 py-2 rounded border border-gray-300 dark:border-gray-700">Cancel</button>
+          <button id="saveItemBtn" class="px-3 py-2 rounded bg-indigo-600 text-white hover:bg-indigo-700">Save</button>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- Footer -->
+    <footer class="mt-auto border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950">
+      <div class="mx-auto max-w-5xl px-4 py-3 text-sm flex justify-between">
+        <p>© Catalog SaaS</p>
+        <p id="statusLabel" aria-live="polite">Offline-ready</p>
+      </div>
+    </footer>
+  </div>
+
+  <!-- App JS -->
+  <script src="app.js"></script>
+  <!-- Register SW -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js');
+      });
+    }
+  </script>
+</body>
+</html>
