@@ -47,7 +47,7 @@ document.querySelectorAll(".card").forEach(card => {
 });
 
 /* -------------------------
-   3D CAROUSEL
+   3D CAROUSEL (CENTERED + NO DRIFT)
 -------------------------- */
 const carousel = document.getElementById("carousel");
 const items = carousel.children;
@@ -56,15 +56,12 @@ const total = items.length;
 let angle = 0;
 const step = 360 / total;
 
-// Position items in a circle
-for (let i = 0; i < total; i++) {
-  const rotate = step * i;
-  
+// Depth always matches carousel size
 function getDepth() {
   return carousel.offsetWidth * 0.9;
 }
 
-  function positionItems() {
+function positionItems() {
   const depth = getDepth();
   for (let i = 0; i < total; i++) {
     const rotate = step * i;
@@ -74,7 +71,6 @@ function getDepth() {
 
 positionItems();
 window.addEventListener("resize", positionItems);
-}
 
 // Rotate carousel
 document.getElementById("next").onclick = () => {
