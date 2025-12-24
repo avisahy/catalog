@@ -1,5 +1,5 @@
 /* -------------------------
-   MODE SWITCHING
+   MODE SWITCHING WITH FADE
 -------------------------- */
 const catalogUI = document.getElementById("catalogUI");
 const carouselUI = document.getElementById("carouselUI");
@@ -7,19 +7,24 @@ const carouselUI = document.getElementById("carouselUI");
 const btnCatalog = document.getElementById("btnCatalog");
 const btnCarousel = document.getElementById("btnCarousel");
 
-btnCatalog.onclick = () => {
+function showCatalog() {
   catalogUI.classList.remove("hidden");
   carouselUI.classList.add("hidden");
+
   btnCatalog.classList.add("active");
   btnCarousel.classList.remove("active");
-};
+}
 
-btnCarousel.onclick = () => {
-  catalogUI.classList.add("hidden");
+function showCarousel() {
   carouselUI.classList.remove("hidden");
-  btnCatalog.classList.remove("active");
+  catalogUI.classList.add("hidden");
+
   btnCarousel.classList.add("active");
-};
+  btnCatalog.classList.remove("active");
+}
+
+btnCatalog.onclick = showCatalog;
+btnCarousel.onclick = showCarousel;
 
 /* -------------------------
    3D CATALOG UI TILT
