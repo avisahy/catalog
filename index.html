@@ -5,39 +5,35 @@
   <title>Catalog PWA</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <!-- PWA manifest -->
-  <link rel="manifest" href="manifest.webmanifest" />
-  <meta name="theme-color" content="#111827" />
-
-  <!-- Basic styles -->
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
+
   <header class="topbar">
     <h1 class="app-title">Catalog</h1>
-    <input
-      id="searchInput"
-      type="search"
-      placeholder="Search items..."
-      class="search-input"
-    />
+    <input id="searchInput" type="search" placeholder="Search items..." class="search-input" />
   </header>
 
   <main class="catalog-container" id="catalog"></main>
 
+  <!-- Template -->
   <template id="itemTemplate">
     <article class="item-card">
       <img class="item-image" alt="" />
-      <div class="item-body">
-        <h2 class="item-title"></h2>
-        <p class="item-description"></p>
-        <div class="item-footer">
-          <span class="item-price"></span>
-          <button class="item-cta">Details</button>
-        </div>
-      </div>
+      <div class="item-body"></div>
     </article>
   </template>
+
+  <!-- Modal -->
+  <div id="modal" class="modal hidden">
+    <div class="modal-content">
+      <button id="modalClose" class="modal-close">✕</button>
+      <img id="modalImage" class="modal-image" />
+      <h2 id="modalTitle"></h2>
+      <p id="modalDescription"></p>
+      <p id="modalPrice" class="modal-price"></p>
+    </div>
+  </div>
 
   <script src="app.js"></script>
 </body>
