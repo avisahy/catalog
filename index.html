@@ -59,12 +59,11 @@
 
       <input id="itemName" type="text" placeholder="Item Title" />
 
-      <label class="img-upload">
-        Upload Image
-        <input id="itemImage" type="file" accept="image/*" />
-      </label>
+      <!-- Hidden file input -->
+      <input id="itemImage" type="file" accept="image/*" hidden />
 
-      <div class="preview-img-wrapper" id="formPreviewWrapper">
+      <!-- Clickable + placeholder -->
+      <div class="preview-img-wrapper clickable" id="formPreviewWrapper">
         <img id="imagePreview" class="preview-square" />
       </div>
 
