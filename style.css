@@ -5,6 +5,7 @@ body {
   color: #fff;
 }
 
+/* HEADER */
 .topbar {
   padding: 20px;
   text-align: center;
@@ -26,7 +27,7 @@ body {
   background: #444;
 }
 
-/* Fade */
+/* FADE */
 .fade {
   opacity: 1;
   transition: opacity 0.5s ease;
@@ -39,7 +40,7 @@ body {
   width: 100%;
 }
 
-/* Catalog */
+/* CATALOG */
 .catalog {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -50,18 +51,23 @@ body {
 .card {
   background: #1a1a1a;
   border-radius: 16px;
-  height: 220px;
-  transform-style: preserve-3d;
-  transition: transform 0.2s ease-out;
   cursor: pointer;
+  overflow: hidden;
+  border: 1px solid #333;
+}
+
+.card img {
+  width: 100%;
+  height: 260px;
+  object-fit: cover;
 }
 
 .card-inner {
-  padding: 20px;
-  transform: translateZ(40px);
+  padding: 15px;
+  text-align: center;
 }
 
-/* Flip Carousel */
+/* FLIP CAROUSEL */
 .flip-container {
   width: 100%;
   height: 70vh;
@@ -73,7 +79,7 @@ body {
 
 .flip-card {
   width: 260px;
-  height: 180px;
+  height: 260px;
   perspective: 1200px;
 }
 
@@ -97,25 +103,17 @@ body {
   justify-content: center;
   align-items: center;
   font-size: 26px;
+  overflow: hidden;
+}
+
+.flip-face img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .back {
   transform: rotateY(180deg);
-}
-
-.controls button {
-  background: #222;
-  border: none;
-  padding: 12px 20px;
-  margin: 10px;
-  color: #fff;
-  font-size: 18px;
-  border-radius: 8px;
-  cursor: pointer;
-}
-
-.controls button:hover {
-  background: #444;
 }
 
 /* POPUP */
@@ -141,8 +139,16 @@ body {
   padding: 30px;
   border-radius: 12px;
   text-align: center;
-  width: 260px;
+  width: 300px;
   border: 1px solid #333;
+}
+
+.popup-img {
+  width: 260px;
+  height: 260px;
+  object-fit: cover;
+  border-radius: 12px;
+  margin-bottom: 15px;
 }
 
 .popup-buttons button {
@@ -155,10 +161,6 @@ body {
   cursor: pointer;
 }
 
-.popup-buttons button:hover {
-  background: #444;
-}
-
 .close-btn {
   margin-top: 15px;
   background: #333;
@@ -167,11 +169,41 @@ body {
   cursor: pointer;
 }
 
-/* Mobile */
-@media (max-width: 600px) {
-  .flip-card {
-    width: 200px;
-    height: 140px;
-  }
+/* FORM */
+.img-upload {
+  display: block;
+  background: #222;
+  padding: 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  margin: 10px 0;
 }
 
+.preview-square {
+  width: 260px;
+  height: 260px;
+  object-fit: cover;
+  border-radius: 12px;
+  margin: 10px auto;
+  display: block;
+}
+
+.hidden {
+  display: none;
+}
+
+/* FAB BUTTON */
+#fab {
+  position: fixed;
+  bottom: 25px;
+  right: 25px;
+  width: 60px;
+  height: 60px;
+  background: #ff0066;
+  border: none;
+  border-radius: 50%;
+  font-size: 32px;
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+}
