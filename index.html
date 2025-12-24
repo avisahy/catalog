@@ -2,10 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0, viewport-fit=cover"
-  />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Catalog</title>
 
   <link rel="manifest" href="manifest.json" />
@@ -17,124 +14,88 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <div class="app" id="app">
+  <div class="app">
+
     <header class="app-header">
-      <div class="app-header-left">
-        <h1 class="app-title">Catalog</h1>
-      </div>
+      <h1 class="app-title">Catalog</h1>
       <div class="app-header-right">
-        <button id="themeToggle" class="icon-button" aria-label="Toggle theme">
-          <span class="icon">🌙</span>
-        </button>
-        <button id="installButton" class="install-button" hidden>
-          Install
-        </button>
+        <button id="themeToggle" class="icon-button"><span class="icon">🌙</span></button>
+        <button id="installButton" class="install-button" hidden>Install</button>
       </div>
     </header>
 
     <main class="app-main">
       <section class="toolbar">
-        <input
-          id="searchInput"
-          class="search"
-          type="text"
-          placeholder="Search items..."
-          aria-label="Search items"
-        />
+        <input id="searchInput" class="search" type="text" placeholder="Search items...">
       </section>
 
-      <section class="catalog" id="catalogList" aria-label="Item catalog">
-        <!-- Items injected by JS -->
-      </section>
+      <section id="catalogList" class="catalog"></section>
 
-      <p id="emptyState" class="empty-state">
-        No items yet. Tap “+ Add Item” to create your first one.
-      </p>
+      <p id="emptyState" class="empty-state">No items yet. Tap “+ Add Item”.</p>
     </main>
 
-    <!-- Floating Action Button -->
-    <button id="fabAdd" class="fab" aria-label="Add item">
-      + Add Item
-    </button>
+    <!-- FAB -->
+    <button id="fabAdd" class="fab">+ Add Item</button>
 
-    <!-- Add/Edit modal -->
-    <div class="modal-backdrop" id="itemModalBackdrop" hidden>
-      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <!-- Add/Edit Modal -->
+    <div id="itemModalBackdrop" class="modal-backdrop" hidden>
+      <div class="modal">
         <div class="modal-header">
           <h2 id="modalTitle">Add item</h2>
-          <button class="icon-button" id="closeModalButton" aria-label="Close">
-            ✕
-          </button>
+          <button id="closeModalButton" class="icon-button">✕</button>
         </div>
+
         <form id="itemForm" class="modal-body">
-          <input type="hidden" id="itemId" />
+          <input type="hidden" id="itemId">
 
           <label class="field">
             <span class="field-label">Name</span>
-            <input
-              id="itemName"
-              type="text"
-              required
-              placeholder="Item name"
-              autocomplete="off"
-            />
+            <input id="itemName" type="text" required placeholder="Item name">
           </label>
 
           <label class="field">
             <span class="field-label">Picture</span>
-            <input
-              id="itemImage"
-              type="file"
-              accept="image/*"
-              capture="environment"
-            />
-            <small class="field-help">
-              Choose from gallery or use camera on mobile.
-            </small>
+            <input id="itemImage" type="file" accept="image/*" capture="environment">
           </label>
 
           <div id="imagePreviewContainer" class="image-preview" hidden>
-            <img id="imagePreview" alt="Selected image preview" />
+            <img id="imagePreview" alt="Preview">
           </div>
 
           <p id="formError" class="form-error" hidden></p>
 
           <div class="modal-footer">
-            <button type="button" class="secondary-button" id="cancelButton">
-              Cancel
-            </button>
-            <button type="submit" class="primary-button" id="saveButton">
-              Save
-            </button>
+            <button type="button" id="cancelButton" class="secondary-button">Cancel</button>
+            <button type="submit" class="primary-button">Save</button>
           </div>
         </form>
       </div>
     </div>
 
-    <!-- Detail modal -->
-    <div class="modal-backdrop" id="detailModalBackdrop" hidden>
-      <div class="modal modal-large" role="dialog" aria-modal="true" aria-labelledby="detailTitle">
+    <!-- Detail Modal -->
+    <div id="detailModalBackdrop" class="modal-backdrop" hidden>
+      <div class="modal modal-large">
         <div class="modal-header">
           <h2 id="detailTitle">Item</h2>
-          <button class="icon-button" id="closeDetailButton" aria-label="Close">
-            ✕
-          </button>
+          <button id="closeDetailButton" class="icon-button">✕</button>
         </div>
-        <div class="modal-body" id="detailBody">
-          <!-- Filled by JS -->
-        </div>
+
+        <div id="detailBody" class="modal-body"></div>
+
         <div class="modal-footer">
-          <button class="danger-button" id="deleteButton">
-            Delete
-          </button>
-          <button class="primary-button" id="editButton">
-            Edit
-          </button>
+          <button id="deleteButton" class="danger-button">Delete</button>
+          <button id="editButton" class="primary-button">Edit</button>
         </div>
       </div>
     </div>
+
+    <!-- FULL SCREEN IMAGE VIEWER -->
+    <div id="fullscreenViewer" class="fullscreen-viewer" hidden>
+      <img id="fullscreenImage" alt="Full screen view">
+    </div>
+
   </div>
 
-  <script src="script.js" defer></script>
+  <script src="script.js"></script>
 </body>
 </html>
