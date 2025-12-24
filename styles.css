@@ -92,9 +92,19 @@ body {
   margin: 1.25rem auto;
   padding: 0 1rem 1.5rem;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   gap: 1.1rem;
+
+  /* Desktop: always 4 columns */
+  grid-template-columns: repeat(4, 1fr);
 }
+
+/* Mobile: always 2 columns */
+@media (max-width: 640px) {
+  .catalog-container {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 
 .item-card {
   display: flex;
