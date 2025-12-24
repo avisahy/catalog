@@ -3,12 +3,30 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>3D Carousel</title>
+  <title>3D Catalog + Carousel</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
-  <div class="carousel-container">
+  <header class="topbar">
+    <h1>3D Catalog System</h1>
+
+    <div class="switcher">
+      <button id="btnCatalog" class="active">3D Catalog UI</button>
+      <button id="btnCarousel">3D Carousel</button>
+    </div>
+  </header>
+
+  <!-- 3D CATALOG UI (DEFAULT) -->
+  <main id="catalogUI" class="catalog">
+    <div class="card"><div class="card-inner"><h2>Item 1</h2></div></div>
+    <div class="card"><div class="card-inner"><h2>Item 2</h2></div></div>
+    <div class="card"><div class="card-inner"><h2>Item 3</h2></div></div>
+    <div class="card"><div class="card-inner"><h2>Item 4</h2></div></div>
+  </main>
+
+  <!-- 3D CAROUSEL UI -->
+  <main id="carouselUI" class="carousel-container hidden">
     <div class="carousel" id="carousel">
       <div class="item">Item 1</div>
       <div class="item">Item 2</div>
@@ -16,12 +34,12 @@
       <div class="item">Item 4</div>
       <div class="item">Item 5</div>
     </div>
-  </div>
 
-  <div class="controls">
-    <button id="prev">◀</button>
-    <button id="next">▶</button>
-  </div>
+    <div class="controls">
+      <button id="prev">◀</button>
+      <button id="next">▶</button>
+    </div>
+  </main>
 
   <script src="script.js"></script>
 </body>
