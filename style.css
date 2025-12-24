@@ -3,7 +3,6 @@ body {
   background: #0d0d0d;
   font-family: Arial, sans-serif;
   color: #fff;
-  overflow-x: hidden;
 }
 
 .topbar {
@@ -30,7 +29,7 @@ body {
 /* Fade */
 .fade {
   opacity: 1;
-  transition: opacity 0.6s ease;
+  transition: opacity 0.5s ease;
 }
 
 .fade.hidden {
@@ -46,7 +45,6 @@ body {
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 30px;
   padding: 40px;
-  perspective: 1200px;
 }
 
 .card {
@@ -63,7 +61,7 @@ body {
   transform: translateZ(40px);
 }
 
-/* FLIP CAROUSEL */
+/* Flip Carousel */
 .flip-container {
   width: 100%;
   height: 70vh;
@@ -71,21 +69,20 @@ body {
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  perspective: 1200px;
 }
 
 .flip-card {
   width: 260px;
   height: 180px;
-  position: relative;
+  perspective: 1200px;
 }
 
 .flip-inner {
   width: 100%;
   height: 100%;
-  position: absolute;
+  position: relative;
   transform-style: preserve-3d;
-  transition: transform 0.8s ease;
+  transition: transform 0.6s ease;
 }
 
 .flip-face {
@@ -96,7 +93,6 @@ body {
   background: #1a1a1a;
   border-radius: 12px;
   border: 1px solid #333;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.4);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -107,7 +103,6 @@ body {
   transform: rotateY(180deg);
 }
 
-/* Buttons */
 .controls button {
   background: #222;
   border: none;
@@ -128,9 +123,5 @@ body {
   .flip-card {
     width: 200px;
     height: 140px;
-  }
-
-  .flip-face {
-    font-size: 20px;
   }
 }
