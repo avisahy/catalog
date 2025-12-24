@@ -40,7 +40,7 @@ body {
   width: 100%;
 }
 
-/* CATALOG — ALWAYS 4 ITEMS PER ROW */
+/* CATALOG GRID */
 .catalog {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -48,7 +48,6 @@ body {
   padding: 40px;
 }
 
-/* MOBILE — 2 ITEMS PER ROW */
 @media (max-width: 600px) {
   .catalog {
     grid-template-columns: repeat(2, 1fr);
@@ -76,15 +75,15 @@ body {
   object-fit: cover;
 }
 
-/* + overlay for placeholder */
-.card-image.placeholder::after {
-  content: "+";
+/* Placeholder text */
+.placeholder-text {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  font-size: 64px;
-  color: #666;
+  font-size: 16px;
+  color: #888;
+  text-transform: capitalize;
   pointer-events: none;
 }
 
@@ -160,7 +159,6 @@ body {
   border: 1px solid #333;
 }
 
-/* Preview image wrapper with + overlay */
 .preview-img-wrapper {
   position: relative;
   width: 260px;
@@ -176,25 +174,8 @@ body {
   object-fit: cover;
 }
 
-.preview-img-wrapper.placeholder::after {
-  content: "+";
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  font-size: 64px;
-  color: #666;
-  pointer-events: none;
-}
-
 .preview-img-wrapper.clickable {
   cursor: pointer;
-}
-
-.popup-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
 }
 
 .popup-buttons button {
