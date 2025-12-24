@@ -47,7 +47,7 @@ document.querySelectorAll(".card").forEach(card => {
 });
 
 /* -------------------------
-   3D CAROUSEL
+   3D CAROUSEL (FULLY RESPONSIVE)
 -------------------------- */
 const carousel = document.getElementById("carousel");
 const items = carousel.children;
@@ -56,12 +56,22 @@ const total = items.length;
 let angle = 0;
 const step = 360 / total;
 
-// Position items in a circle
-for (let i = 0; i < total; i++) {
-  const rotate = step * i;
-  const depth = window.innerWidth < 600 ? 180 : 300;
-items[i].style.transform = `rotateY(${rotate}deg) translateZ(${depth}px)`;
+// Responsive depth based on viewport width
+function getDepth() {
+  return Math.min(window.innerWidth * 0.3, 300);
 }
+
+// Position items in a circle
+function positionItems() {
+  const depth = getDepth();
+  for (let i = 0; i < total; i++) {
+    const rotate = step * i;
+    items[i].style.transform = `rotateY(${rotate}deg) translateZ(${depth}px)`;
+  }
+}
+
+positionItems();
+window.addEventListener("resize", positionItems);
 
 // Rotate carousel
 document.getElementById("next").onclick = () => {
