@@ -1,40 +1,24 @@
-const CACHE_NAME = "catalog-pwa-v1";
-const ASSETS = [
-  "./",
-  "./index.html",
-  "./styles.css",
-  "./app.js",
-  "./manifest.webmanifest"
-  // Icons will be fetched and cached on demand
+const CACHE_NAME = "catalog-cache-v1";
+const FILES = [
+    "/",
+    "/index.html",
+    "/css/styles.css",
+    "/js/app.js",
+    "/js/router.js",
+    "/js/storage.js",
+    "/js/views.js",
+    "/js/sample-data.js",
+    "/assets/placeholder.png"
 ];
 
-self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS);
-    })
-  );
+self.addEventListener("install", e => {
+    e.waitUntil(
+        caches.open(CACHE_NAME).then(cache => cache.addAll(FILES))
+    );
 });
 
-self.addEventListener("activate", (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys.map((key) => (key === CACHE_NAME ? null : caches.delete(key)))
-      )
-    )
-  );
-});
-
-self.addEventListener("fetch", (event) => {
-  event.respondWith(
-    caches.match(event.request).then((cached) => {
-      return (
-        cached ||
-        fetch(event.request).catch(() => {
-          // Optional: return fallback here if needed
-        })
-      );
-    })
-  );
+self.addEventListener("fetch", e => {
+    e.respondWith(
+        caches.match(e.request).then(res => res || fetch(e.request))
+    );
 });
