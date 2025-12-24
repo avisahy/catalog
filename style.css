@@ -1,0 +1,40 @@
+body {
+  margin: 0;
+  background: #0d0d0d;
+  font-family: Arial, sans-serif;
+  color: #fff;
+  overflow-x: hidden;
+}
+
+.topbar {
+  padding: 20px;
+  text-align: center;
+  background: #111;
+  border-bottom: 1px solid #222;
+}
+
+.catalog {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 30px;
+  padding: 40px;
+  perspective: 1200px;
+}
+
+.card {
+  background: #1a1a1a;
+  border-radius: 16px;
+  height: 220px;
+  transform-style: preserve-3d;
+  transition: transform 0.2s ease-out;
+  cursor: pointer;
+}
+
+.card-inner {
+  padding: 20px;
+  transform: translateZ(40px);
+}
+
+.card:hover {
+  box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+}
