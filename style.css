@@ -180,6 +180,11 @@ body {
   border-radius: 8px;
   cursor: pointer;
   margin: 10px 0;
+  text-align: center;
+}
+
+.img-upload input {
+  display: none;
 }
 
 .preview-square {
@@ -189,6 +194,16 @@ body {
   border-radius: 12px;
   margin: 10px auto;
   display: block;
+}
+
+.remove-img-btn {
+  background: #aa0000;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 8px;
+  color: #fff;
+  cursor: pointer;
+  margin-bottom: 10px;
 }
 
 .hidden {
