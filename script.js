@@ -5,7 +5,7 @@ const PLACEHOLDER =
 "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
 
 /* -------------------------
-   LOCAL STORAGE SYSTEM
+   LOCAL STORAGE
 -------------------------- */
 function loadItems() {
   return JSON.parse(localStorage.getItem("items") || "[]");
@@ -53,12 +53,12 @@ function renderCatalog() {
     const isPlaceholder = !item.image || item.image === PLACEHOLDER;
     const imageSrc = item.image || PLACEHOLDER;
 
-   card.innerHTML = `
-     <div class="card-image ${isPlaceholder ? "placeholder" : ""}">
-       <img src="${imageSrc}" />
-     </div>
-   `;
-
+    card.innerHTML = `
+      <div class="card-image">
+        <img src="${imageSrc}" />
+        ${isPlaceholder ? `<div class="placeholder-text">Preview item</div>` : ""}
+      </div>
+    `;
 
     card.onclick = () => openPreview(index);
     catalogUI.appendChild(card);
@@ -74,6 +74,7 @@ const popup = document.getElementById("previewPopup");
 const previewTitle = document.getElementById("previewTitle");
 const previewImage = document.getElementById("previewImage");
 const previewWrapper = document.getElementById("previewWrapper");
+const previewText = document.getElementById("previewText");
 
 let selectedIndex = null;
 
@@ -88,18 +89,18 @@ function openPreview(index) {
   previewImage.src = imageSrc;
 
   if (isPlaceholder) {
-    previewWrapper.classList.add("placeholder");
+    previewText.textContent = "No image to preview";
+    previewText.style.display = "block";
   } else {
-    previewWrapper.classList.remove("placeholder");
+    previewText.style.display = "none";
   }
 
   popup.classList.remove("hidden");
 }
 
-/* Clicking + in preview opens Edit (ONLY if placeholder) */
+/* Clicking placeholder text opens Edit */
 previewWrapper.onclick = () => {
-  const isPlaceholder = previewImage.src === PLACEHOLDER;
-  if (isPlaceholder) {
+  if (previewImage.src === PLACEHOLDER) {
     popup.classList.add("hidden");
     openForm("edit");
   }
@@ -133,6 +134,7 @@ const itemImage = document.getElementById("itemImage");
 const imagePreview = document.getElementById("imagePreview");
 const removeImageBtn = document.getElementById("removeImage");
 const formPreviewWrapper = document.getElementById("formPreviewWrapper");
+const formPreviewText = document.getElementById("formPreviewText");
 
 let formMode = "add";
 
@@ -145,7 +147,8 @@ function openForm(mode) {
     formTitle.textContent = "Add Item";
     itemName.value = "";
     imagePreview.src = PLACEHOLDER;
-    formPreviewWrapper.classList.add("placeholder");
+    formPreviewText.textContent = "Add picture";
+    formPreviewText.style.display = "block";
     removeImageBtn.classList.add("hidden");
   } else {
     formTitle.textContent = "Edit Item";
@@ -157,10 +160,11 @@ function openForm(mode) {
     imagePreview.src = imageSrc;
 
     if (isPlaceholder) {
-      formPreviewWrapper.classList.add("placeholder");
+      formPreviewText.textContent = "Add picture";
+      formPreviewText.style.display = "block";
       removeImageBtn.classList.add("hidden");
     } else {
-      formPreviewWrapper.classList.remove("placeholder");
+      formPreviewText.style.display = "none";
       removeImageBtn.classList.remove("hidden");
     }
   }
@@ -168,7 +172,7 @@ function openForm(mode) {
   formPopup.classList.remove("hidden");
 }
 
-/* Clicking the + opens file picker */
+/* Clicking placeholder opens file picker */
 formPreviewWrapper.onclick = () => itemImage.click();
 
 /* IMAGE UPLOAD */
@@ -179,7 +183,7 @@ itemImage.onchange = () => {
   const reader = new FileReader();
   reader.onload = e => {
     imagePreview.src = e.target.result;
-    formPreviewWrapper.classList.remove("placeholder");
+    formPreviewText.style.display = "none";
     removeImageBtn.classList.remove("hidden");
   };
   reader.readAsDataURL(file);
@@ -188,7 +192,8 @@ itemImage.onchange = () => {
 /* REMOVE IMAGE */
 removeImageBtn.onclick = () => {
   imagePreview.src = PLACEHOLDER;
-  formPreviewWrapper.classList.add("placeholder");
+  formPreviewText.textContent = "Add picture";
+  formPreviewText.style.display = "block";
   removeImageBtn.classList.add("hidden");
 };
 
