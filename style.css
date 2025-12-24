@@ -112,3 +112,23 @@ body {
 .controls button:hover {
   background: #444;
 }
+
+/* MOBILE FIXES */
+@media (max-width: 600px) {
+  .carousel {
+    width: 200px;
+    height: 200px;
+  }
+
+  .item {
+    width: 120px;
+    height: 80px;
+    font-size: 16px;
+  }
+
+  .carousel-container {
+    height: 60vh;
+    margin-top: 20px;
+  }
+}
+
