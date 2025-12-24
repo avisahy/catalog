@@ -73,6 +73,7 @@ body {
   flex-direction: column;
   justify-content: center;
   align-items: center;
+  padding-top: 40px;
 }
 
 .carousel {
@@ -129,6 +130,7 @@ body {
   .carousel-container {
     height: 60vh;
     margin-top: 20px;
+    padding-top: 60px;
   }
 }
 
