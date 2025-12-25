@@ -335,21 +335,21 @@ mergeBtn.onclick = async () => {
   if (ok !== "continue") return;
 
   const current = loadItems();
-  
-  // Combine imported + current
-  const combined = [...importedItems, ...current];
-  
-  // Remove duplicates by ID
-  const unique = combined.filter(
-    (item, index, self) =>
-      index === self.findIndex(other => other.id === item.id)
-  );
-  
-  saveItems(unique);
 
+  // Map existing items first
+  const map = new Map(current.map(item => [item.id, item]));
 
+  // Add imported items ONLY if ID does not exist
+  importedItems.forEach(item => {
+    if (!map.has(item.id)) {
+      map.set(item.id, item);
+    }
+  });
+
+  saveItems([...map.values()]);
   returnBtn.onclick();
 };
+
 
 // ---------- MAKE IT MY DATABASE ----------
 makeMineBtn.onclick = async () => {
