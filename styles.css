@@ -212,6 +212,11 @@ body {
   color: var(--text);
 }
 
+/* Hide export button when not needed */
+#confirm-export.hidden {
+  display: none !important;
+}
+
 /* Footer */
 .app-footer {
   text-align: center;
