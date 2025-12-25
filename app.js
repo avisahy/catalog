@@ -331,7 +331,7 @@ mergeBtn.onclick = async () => {
     danger: false
   });
 
-  if (!ok) return;
+  if (ok !== "continue") return;
 
   const current = loadItems();
   const merged = [...importedItems, ...current];
@@ -352,7 +352,7 @@ makeMineBtn.onclick = async () => {
 
   if (choice === "cancel") return;
 
-  if (choice === "export") {
+  if (choice === "continue" || choice === "export") {
     const data = JSON.stringify(loadItems(), null, 2);
     const blob = new Blob([data], { type: "application/json" });
     const url = URL.createObjectURL(blob);
