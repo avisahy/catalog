@@ -22,6 +22,7 @@ const menuBtn = document.getElementById("menu-btn");
 const menuDropdown = document.getElementById("menu-dropdown");
 const importBtn = document.getElementById("import-btn");
 const exportBtn = document.getElementById("export-btn");
+const deleteAllBtn = document.getElementById("delete-all-btn");
 const toggleDarkBtn = document.getElementById("toggle-dark");
 const returnBtn = document.getElementById("return-btn");
 
@@ -82,6 +83,15 @@ function saveItems(items) {
   localStorage.setItem(STORAGE_KEY_ITEMS, JSON.stringify(items));
 }
 
+// ---------- DELETE ITEM ----------
+function deleteItem(id) {
+  if (viewOnlyMode) return;
+
+  const items = loadItems().filter(item => item.id !== id);
+  saveItems(items);
+  renderItems();
+}
+
 // ---------- RENDER ----------
 function renderItems() {
   const items = viewOnlyMode ? importedItems : loadItems();
@@ -105,9 +115,20 @@ function renderItems() {
 
     body.appendChild(name);
 
+    // DELETE BUTTON (hidden in view-only mode)
+    if (!viewOnlyMode) {
+      const del = document.createElement("button");
+      del.className = "item-delete";
+      del.textContent = "×";
+      del.onclick = (e) => {
+        e.stopPropagation();
+        deleteItem(item.id);
+      };
+      card.appendChild(del);
+    }
+
     card.appendChild(img);
     card.appendChild(body);
-
     itemsGrid.appendChild(card);
   });
 }
@@ -221,6 +242,19 @@ importBtn.onclick = () => {
   input.click();
 };
 
+// ---------- DELETE ALL ----------
+deleteAllBtn.onclick = () => {
+  if (!confirm("Delete ALL your data? This cannot be undone.")) return;
+
+  viewOnlyMode = false;
+  importedItems = [];
+  returnBtn.classList.add("hidden");
+  fab.style.display = "block";
+
+  localStorage.removeItem(STORAGE_KEY_ITEMS);
+  renderItems();
+};
+
 // ---------- RETURN TO MY DATABASE ----------
 returnBtn.onclick = () => {
   viewOnlyMode = false;
@@ -238,6 +272,6 @@ loadTheme();
 addModal.classList.add("hidden");
 previewModal.classList.add("hidden");
 menuDropdown.classList.add("hidden");
-returnBtn.classList.add("hidden"); // FORCE HIDE ON LOAD
+returnBtn.classList.add("hidden");
 
 renderItems();
