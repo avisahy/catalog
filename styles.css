@@ -33,6 +33,9 @@ body {
   padding: 1rem;
   background: var(--bg-elevated);
   border-bottom: 1px solid var(--border);
+
+  /* FIX: anchor dropdown to header */
+  position: relative;
 }
 
 .search {
@@ -57,8 +60,12 @@ body {
 /* Dropdown menu */
 .dropdown {
   position: absolute;
-  top: 60px;
-  right: 10px;
+
+  /* FIX: open below the 3-dot button */
+  top: 100%;
+  right: 0;
+  margin-top: 0.5rem;
+
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: 0.5rem;
