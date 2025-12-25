@@ -27,6 +27,48 @@ const toggleDarkBtn = document.getElementById("toggle-dark");
 const returnBtn = document.getElementById("return-btn");
 const installBtn = document.getElementById("install-btn");
 
+const mergeBtn = document.getElementById("merge-btn");
+const makeMineBtn = document.getElementById("make-mine-btn");
+
+// Confirmation modal elements
+const confirmModal = document.getElementById("confirm-modal");
+const confirmTitle = document.getElementById("confirm-title");
+const confirmMessage = document.getElementById("confirm-message");
+const confirmCancel = document.getElementById("confirm-cancel");
+const confirmOk = document.getElementById("confirm-ok");
+
+// ---------- CONFIRMATION MODAL ----------
+function showConfirm({ title, message, danger = false }) {
+  return new Promise((resolve) => {
+    confirmTitle.textContent = title;
+    confirmMessage.textContent = message;
+
+    confirmOk.textContent = danger ? "Delete" : "OK";
+    confirmOk.classList.toggle("danger", danger);
+
+    confirmModal.classList.remove("hidden");
+
+    const handleCancel = () => {
+      cleanup();
+      resolve(false);
+    };
+
+    const handleOk = () => {
+      cleanup();
+      resolve(true);
+    };
+
+    function cleanup() {
+      confirmModal.classList.add("hidden");
+      confirmCancel.removeEventListener("click", handleCancel);
+      confirmOk.removeEventListener("click", handleOk);
+    }
+
+    confirmCancel.addEventListener("click", handleCancel);
+    confirmOk.addEventListener("click", handleOk);
+  });
+}
+
 // ---------- THEME ----------
 function applyTheme(theme) {
   document.body.classList.toggle("dark", theme === "dark");
@@ -58,7 +100,11 @@ document.addEventListener("click", (e) => {
 // ---------- MODAL ----------
 fab.onclick = () => {
   if (viewOnlyMode) {
-    alert("Cannot add items in view-only mode");
+    showConfirm({
+      title: "View Only Mode",
+      message: "You cannot add items while viewing an imported database.",
+      danger: false
+    });
     return;
   }
   addModal.classList.remove("hidden");
@@ -85,8 +131,16 @@ function saveItems(items) {
 }
 
 // ---------- DELETE ITEM ----------
-function deleteItem(id) {
+async function deleteItem(id) {
   if (viewOnlyMode) return;
+
+  const ok = await showConfirm({
+    title: "Delete Item",
+    message: "Are you sure you want to delete this item?",
+    danger: true
+  });
+
+  if (!ok) return;
 
   const items = loadItems().filter(item => item.id !== id);
   saveItems(items);
@@ -155,16 +209,17 @@ function fileToBase64(file) {
 itemForm.onsubmit = async (e) => {
   e.preventDefault();
 
-  if (viewOnlyMode) {
-    alert("Cannot add items in view-only mode");
-    return;
-  }
+  if (viewOnlyMode) return;
 
   const name = itemNameInput.value.trim();
   const file = fileInput.files[0];
 
   if (!name || !file) {
-    alert("Name and picture required");
+    showConfirm({
+      title: "Missing Fields",
+      message: "Name and picture are required.",
+      danger: false
+    });
     return;
   }
 
@@ -223,28 +278,83 @@ importBtn.onclick = () => {
       const parsed = JSON.parse(text);
 
       if (!Array.isArray(parsed)) {
-        alert("Invalid file format");
+        showConfirm({
+          title: "Invalid File",
+          message: "This file does not contain a valid database.",
+          danger: false
+        });
         return;
       }
 
       importedItems = parsed;
       viewOnlyMode = true;
 
+      // Switch menu
+      importBtn.classList.add("hidden");
+      exportBtn.classList.add("hidden");
+      deleteAllBtn.classList.add("hidden");
+
+      mergeBtn.classList.remove("hidden");
+      makeMineBtn.classList.remove("hidden");
+
       returnBtn.classList.remove("hidden");
       fab.style.display = "none";
 
       renderItems();
     } catch (err) {
-      alert("Failed to import database");
+      showConfirm({
+        title: "Import Failed",
+        message: "Could not read or parse the file.",
+        danger: false
+      });
     }
   };
 
   input.click();
 };
 
+// ---------- MERGE ----------
+mergeBtn.onclick = async () => {
+  const ok = await showConfirm({
+    title: "Merge Database",
+    message: "This will add imported items to your database.",
+    danger: false
+  });
+
+  if (!ok) return;
+
+  const current = loadItems();
+  const merged = [...importedItems, ...current];
+
+  saveItems(merged);
+
+  returnBtn.onclick();
+};
+
+// ---------- MAKE IT MY DATABASE ----------
+makeMineBtn.onclick = async () => {
+  const ok = await showConfirm({
+    title: "Replace Database",
+    message: "This will overwrite your entire database.",
+    danger: true
+  });
+
+  if (!ok) return;
+
+  saveItems(importedItems);
+
+  returnBtn.onclick();
+};
+
 // ---------- DELETE ALL ----------
-deleteAllBtn.onclick = () => {
-  if (!confirm("Delete ALL your data? This cannot be undone.")) return;
+deleteAllBtn.onclick = async () => {
+  const ok = await showConfirm({
+    title: "Delete All Data",
+    message: "This cannot be undone.",
+    danger: true
+  });
+
+  if (!ok) return;
 
   viewOnlyMode = false;
   importedItems = [];
@@ -263,6 +373,13 @@ returnBtn.onclick = () => {
   returnBtn.classList.add("hidden");
   fab.style.display = "block";
 
+  importBtn.classList.remove("hidden");
+  exportBtn.classList.remove("hidden");
+  deleteAllBtn.classList.remove("hidden");
+
+  mergeBtn.classList.add("hidden");
+  makeMineBtn.classList.add("hidden");
+
   renderItems();
 };
 
@@ -280,7 +397,6 @@ function isInStandaloneMode() {
 
 installBtn.classList.add("hidden");
 
-// Android / Desktop Chrome
 window.addEventListener("beforeinstallprompt", (e) => {
   e.preventDefault();
   deferredPrompt = e;
@@ -291,21 +407,25 @@ installBtn.onclick = async () => {
   menuDropdown.classList.add("hidden");
 
   if (isIOS()) {
-    alert(
-      "To install this app on iOS:\n\n" +
-      "1. Tap the Share button (square with arrow)\n" +
-      "2. Choose “Add to Home Screen”"
-    );
+    showConfirm({
+      title: "Install on iOS",
+      message: "Tap the Share button and choose 'Add to Home Screen'.",
+      danger: false
+    });
     return;
   }
 
   if (!deferredPrompt) {
-    alert("Installation is not available on this device.");
+    showConfirm({
+      title: "Not Available",
+      message: "Installation is not available on this device.",
+      danger: false
+    });
     return;
   }
 
   deferredPrompt.prompt();
-  const choice = await deferredPrompt.userChoice;
+  await deferredPrompt.userChoice;
 
   deferredPrompt = null;
   installBtn.classList.add("hidden");
