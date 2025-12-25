@@ -38,36 +38,46 @@ const confirmCancel = document.getElementById("confirm-cancel");
 const confirmOk = document.getElementById("confirm-ok");
 
 // ---------- CONFIRMATION MODAL ----------
-function showConfirm({ title, message, danger = false }) {
+function showConfirm({ title, message, danger = false, showExport = false }) {
   return new Promise((resolve) => {
     confirmTitle.textContent = title;
     confirmMessage.textContent = message;
 
-    confirmOk.textContent = danger ? "Delete" : "OK";
+    confirmOk.textContent = danger ? "Continue Anyway" : "OK";
     confirmOk.classList.toggle("danger", danger);
+
+    confirmExport.classList.toggle("hidden", !showExport);
 
     confirmModal.classList.remove("hidden");
 
     const handleCancel = () => {
       cleanup();
-      resolve(false);
+      resolve("cancel");
     };
 
     const handleOk = () => {
       cleanup();
-      resolve(true);
+      resolve("continue");
+    };
+
+    const handleExport = () => {
+      cleanup();
+      resolve("export");
     };
 
     function cleanup() {
       confirmModal.classList.add("hidden");
       confirmCancel.removeEventListener("click", handleCancel);
       confirmOk.removeEventListener("click", handleOk);
+      confirmExport.removeEventListener("click", handleExport);
     }
 
     confirmCancel.addEventListener("click", handleCancel);
     confirmOk.addEventListener("click", handleOk);
+    confirmExport.addEventListener("click", handleExport);
   });
 }
+
 
 // ---------- THEME ----------
 function applyTheme(theme) {
@@ -333,18 +343,33 @@ mergeBtn.onclick = async () => {
 
 // ---------- MAKE IT MY DATABASE ----------
 makeMineBtn.onclick = async () => {
-  const ok = await showConfirm({
+  const choice = await showConfirm({
     title: "Replace Database",
     message: "This will overwrite your entire database.",
-    danger: true
+    danger: true,
+    showExport: true
   });
 
-  if (!ok) return;
+  if (choice === "cancel") return;
+
+  if (choice === "export") {
+    const data = JSON.stringify(loadItems(), null, 2);
+    const blob = new Blob([data], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "my-database-backup.json";
+    a.click();
+
+    URL.revokeObjectURL(url);
+  }
 
   saveItems(importedItems);
 
   returnBtn.onclick();
 };
+
 
 // ---------- DELETE ALL ----------
 deleteAllBtn.onclick = async () => {
