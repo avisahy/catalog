@@ -5,9 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Item Catalog</title>
 
-  <link rel="stylesheet" href="styles.css" />
-  <link rel="manifest" href="manifest.webmanifest">
-
+  <link rel="stylesheet" href="/catalog/styles.css" />
+  <link rel="manifest" href="/catalog/manifest.webmanifest">
 </head>
 
 <body>
@@ -48,6 +47,19 @@
     <img id="preview-img">
   </div>
 
+  <!-- Confirmation Modal -->
+  <div id="confirm-modal" class="modal hidden">
+    <div class="modal-content">
+      <h2 id="confirm-title"></h2>
+      <p id="confirm-message"></p>
+
+      <div class="confirm-buttons">
+        <button id="confirm-cancel" class="secondary-btn">Cancel</button>
+        <button id="confirm-ok" class="primary-btn">OK</button>
+      </div>
+    </div>
+  </div>
+
   <header class="app-header">
     <h1>Item Catalog</h1>
 
@@ -62,6 +74,10 @@
       <button id="export-btn">Export Database</button>
       <button id="delete-all-btn">Delete All Data</button>
       <button id="toggle-dark">Toggle Dark Mode</button>
+
+      <button id="merge-btn" class="hidden">Merge to My Database</button>
+      <button id="make-mine-btn" class="hidden">Make It My Database</button>
+
       <button id="install-btn">Install App</button>
       <button id="return-btn" class="hidden">Return to My Database</button>
     </div>
@@ -75,7 +91,7 @@
     <small>Offline-ready PWA</small>
   </footer>
 
-  <script src="app.js"></script>
+  <script src="/catalog/app.js"></script>
   <script>
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/catalog/service-worker.js");
