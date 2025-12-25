@@ -225,3 +225,11 @@ body {
   font-size: 0.8rem;
   color: var(--subtle-text);
 }
+
+/* FINAL OVERRIDE — hidden ALWAYS hides */
+.hidden {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
