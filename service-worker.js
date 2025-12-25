@@ -1,12 +1,13 @@
 const CACHE_NAME = "item-catalog-cache-v1";
+
 const ASSETS = [
-  "./",
-  "./index.html",
-  "./styles.css",
-  "./app.js",
-  "./manifest.webmanifest",
-  "./icons/icon-192.png",
-  "./icons/icon-512.png"
+  "/catalog/",
+  "/catalog/index.html",
+  "/catalog/styles.css",
+  "/catalog/app.js",
+  "/catalog/manifest.webmanifest",
+  "/catalog/icons/icon-192.png",
+  "/catalog/icons/icon-512.png"
 ];
 
 self.addEventListener("install", (event) => {
@@ -34,8 +35,10 @@ self.addEventListener("fetch", (event) => {
 
   event.respondWith(
     caches.match(event.request).then((cached) => {
-      if (cached) return cached;
-      return fetch(event.request).catch(() => cached);
+      return (
+        cached ||
+        fetch(event.request).catch(() => cached)
+      );
     })
   );
 });
