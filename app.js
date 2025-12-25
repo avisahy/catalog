@@ -207,7 +207,7 @@ importBtn.onclick = () => {
       importedItems = parsed;
       viewOnlyMode = true;
 
-      returnBtn.classList.remove("hidden"); // FIX
+      returnBtn.classList.remove("hidden");
       fab.style.display = "none";
 
       renderItems();
@@ -224,7 +224,7 @@ returnBtn.onclick = () => {
   viewOnlyMode = false;
   importedItems = [];
 
-  returnBtn.classList.add("hidden"); // FIX
+  returnBtn.classList.add("hidden");
   fab.style.display = "block";
 
   renderItems();
