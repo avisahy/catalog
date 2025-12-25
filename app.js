@@ -25,6 +25,7 @@ const exportBtn = document.getElementById("export-btn");
 const deleteAllBtn = document.getElementById("delete-all-btn");
 const toggleDarkBtn = document.getElementById("toggle-dark");
 const returnBtn = document.getElementById("return-btn");
+const installBtn = document.getElementById("install-btn");
 
 // ---------- THEME ----------
 function applyTheme(theme) {
@@ -115,7 +116,6 @@ function renderItems() {
 
     body.appendChild(name);
 
-    // DELETE BUTTON (hidden in view-only mode)
     if (!viewOnlyMode) {
       const del = document.createElement("button");
       del.className = "item-delete";
@@ -265,6 +265,55 @@ returnBtn.onclick = () => {
 
   renderItems();
 };
+
+// ---------- INSTALL BUTTON ----------
+let deferredPrompt = null;
+
+function isIOS() {
+  return /iphone|ipad|ipod/i.test(window.navigator.userAgent);
+}
+
+function isInStandaloneMode() {
+  return window.matchMedia("(display-mode: standalone)").matches ||
+         window.navigator.standalone === true;
+}
+
+installBtn.classList.add("hidden");
+
+// Android / Desktop Chrome
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  installBtn.classList.remove("hidden");
+});
+
+installBtn.onclick = async () => {
+  menuDropdown.classList.add("hidden");
+
+  if (isIOS()) {
+    alert(
+      "To install this app on iOS:\n\n" +
+      "1. Tap the Share button (square with arrow)\n" +
+      "2. Choose “Add to Home Screen”"
+    );
+    return;
+  }
+
+  if (!deferredPrompt) {
+    alert("Installation is not available on this device.");
+    return;
+  }
+
+  deferredPrompt.prompt();
+  const choice = await deferredPrompt.userChoice;
+
+  deferredPrompt = null;
+  installBtn.classList.add("hidden");
+};
+
+if (isInStandaloneMode()) {
+  installBtn.classList.add("hidden");
+}
 
 // ---------- INIT ----------
 loadTheme();
