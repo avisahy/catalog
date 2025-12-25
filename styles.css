@@ -44,6 +44,36 @@ body {
   color: var(--text);
 }
 
+/* Dropdown menu */
+.dropdown {
+  position: absolute;
+  top: 60px;
+  right: 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  z-index: 200;
+}
+
+.dropdown button {
+  padding: 0.7rem 1rem;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.dropdown button:hover {
+  background: var(--accent-soft);
+}
+
+.hidden {
+  display: none;
+}
+
 /* Items grid */
 .app-main {
   padding: 1rem;
@@ -76,12 +106,6 @@ body {
 .item-name {
   margin: 0;
   font-weight: bold;
-}
-
-.item-date {
-  margin: 0;
-  font-size: 0.75rem;
-  color: var(--subtle-text);
 }
 
 /* FAB */
@@ -118,10 +142,6 @@ body {
   border-radius: 1rem;
   width: 90%;
   max-width: 400px;
-}
-
-.hidden {
-  display: none;
 }
 
 /* Custom file picker */
