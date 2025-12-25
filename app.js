@@ -335,9 +335,18 @@ mergeBtn.onclick = async () => {
   if (ok !== "continue") return;
 
   const current = loadItems();
-  const merged = [...importedItems, ...current];
+  
+  // Combine imported + current
+  const combined = [...importedItems, ...current];
+  
+  // Remove duplicates by ID
+  const unique = combined.filter(
+    (item, index, self) =>
+      index === self.findIndex(other => other.id === item.id)
+  );
+  
+  saveItems(unique);
 
-  saveItems(merged);
 
   returnBtn.onclick();
 };
