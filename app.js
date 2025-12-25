@@ -2,6 +2,10 @@
 const STORAGE_KEY_ITEMS = "itemCatalogItems";
 const STORAGE_KEY_THEME = "itemCatalogTheme";
 
+let viewOnlyMode = false;
+let importedItems = [];
+
+// Elements
 const fab = document.getElementById("fab-add");
 const addModal = document.getElementById("add-modal");
 const closeModal = document.getElementById("close-modal");
@@ -13,12 +17,17 @@ const itemsGrid = document.getElementById("items-grid");
 const search = document.getElementById("search");
 const previewModal = document.getElementById("preview-modal");
 const previewImg = document.getElementById("preview-img");
-const darkToggle = document.getElementById("dark-mode-toggle");
+
+const menuBtn = document.getElementById("menu-btn");
+const menuDropdown = document.getElementById("menu-dropdown");
+const importBtn = document.getElementById("import-btn");
+const exportBtn = document.getElementById("export-btn");
+const toggleDarkBtn = document.getElementById("toggle-dark");
+const returnBtn = document.getElementById("return-btn");
 
 // ---------- Theme ----------
 function applyTheme(theme) {
   document.body.classList.toggle("dark", theme === "dark");
-  darkToggle.textContent = theme === "dark" ? "☀️" : "🌙";
 }
 
 function loadTheme() {
@@ -26,14 +35,29 @@ function loadTheme() {
   applyTheme(saved || "light");
 }
 
-darkToggle.onclick = () => {
+toggleDarkBtn.onclick = () => {
   const newTheme = document.body.classList.contains("dark") ? "light" : "dark";
   applyTheme(newTheme);
   localStorage.setItem(STORAGE_KEY_THEME, newTheme);
 };
 
+// ---------- Menu ----------
+menuBtn.onclick = () => {
+  menuDropdown.classList.toggle("hidden");
+};
+
+document.addEventListener("click", (e) => {
+  if (!menuBtn.contains(e.target) && !menuDropdown.contains(e.target)) {
+    menuDropdown.classList.add("hidden");
+  }
+});
+
 // ---------- Modal ----------
-fab.onclick = () => addModal.classList.remove("hidden");
+fab.onclick = () => {
+  if (viewOnlyMode) return alert("Cannot add items in view-only mode");
+  addModal.classList.remove("hidden");
+};
+
 closeModal.onclick = () => addModal.classList.add("hidden");
 
 // ---------- Custom file picker ----------
@@ -56,7 +80,7 @@ function saveItems(items) {
 
 // ---------- Render ----------
 function renderItems() {
-  const items = loadItems();
+  const items = viewOnlyMode ? importedItems : loadItems();
   itemsGrid.innerHTML = "";
 
   items.forEach(item => {
@@ -74,12 +98,7 @@ function renderItems() {
     name.className = "item-name";
     name.textContent = item.name;
 
-    const date = document.createElement("p");
-    date.className = "item-date";
-    date.textContent = new Date(item.createdAt).toLocaleDateString();
-
     body.appendChild(name);
-    body.appendChild(date);
 
     card.appendChild(img);
     card.appendChild(body);
@@ -108,6 +127,8 @@ function fileToBase64(file) {
 itemForm.onsubmit = async (e) => {
   e.preventDefault();
 
+  if (viewOnlyMode) return alert("Cannot add items in view-only mode");
+
   const name = itemNameInput.value.trim();
   const file = fileInput.files[0];
 
@@ -119,8 +140,7 @@ itemForm.onsubmit = async (e) => {
   items.unshift({
     id: Date.now(),
     name,
-    imageData,
-    createdAt: new Date().toISOString()
+    imageData
   });
 
   saveItems(items);
@@ -138,6 +158,46 @@ search.oninput = () => {
     const name = card.querySelector(".item-name").textContent.toLowerCase();
     card.style.display = name.includes(q) ? "" : "none";
   });
+};
+
+// ---------- Import / Export ----------
+exportBtn.onclick = () => {
+  const data = JSON.stringify(loadItems(), null, 2);
+  const blob = new Blob([data], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "my-database.json";
+  a.click();
+};
+
+importBtn.onclick = () => {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = "application/json";
+
+  input.onchange = async () => {
+    const file = input.files[0];
+    const text = await file.text();
+    importedItems = JSON.parse(text);
+
+    viewOnlyMode = true;
+    returnBtn.classList.remove("hidden");
+    fab.style.display = "none";
+
+    renderItems();
+  };
+
+  input.click();
+};
+
+returnBtn.onclick = () => {
+  viewOnlyMode = false;
+  importedItems = [];
+  returnBtn.classList.add("hidden");
+  fab.style.display = "block";
+  renderItems();
 };
 
 // ---------- Init ----------
