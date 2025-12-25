@@ -44,6 +44,15 @@ body {
   color: var(--text);
 }
 
+/* 3-dot icon button */
+.icon-button {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 1.4rem;
+  padding: 0.2rem 0.4rem;
+}
+
 /* Dropdown menu */
 .dropdown {
   position: absolute;
@@ -68,10 +77,6 @@ body {
 
 .dropdown button:hover {
   background: var(--accent-soft);
-}
-
-.hidden {
-  display: none;
 }
 
 /* Items grid */
@@ -125,8 +130,9 @@ body {
   z-index: 50;
 }
 
-/* Modal */
-.modal, .preview {
+/* Modal & Preview base */
+.modal,
+.preview {
   position: fixed;
   inset: 0;
   background: rgba(0,0,0,0.7);
@@ -136,6 +142,14 @@ body {
   z-index: 100;
 }
 
+/* CRUCIAL FIX: when .hidden is present, force them to be gone */
+.modal.hidden,
+.preview.hidden,
+.dropdown.hidden {
+  display: none !important;
+}
+
+/* Modal content */
 .modal-content {
   background: var(--bg-elevated);
   padding: 1.5rem;
@@ -158,7 +172,7 @@ body {
   background: var(--accent-soft);
 }
 
-/* Fullscreen preview */
+/* Fullscreen preview image */
 .preview img {
   max-width: 95%;
   max-height: 95%;
@@ -183,4 +197,12 @@ body {
 .secondary-btn {
   background: var(--border);
   color: var(--text);
+}
+
+/* Footer */
+.app-footer {
+  text-align: center;
+  padding: 0.75rem;
+  font-size: 0.8rem;
+  color: var(--subtle-text);
 }
