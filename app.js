@@ -36,6 +36,7 @@ const confirmTitle = document.getElementById("confirm-title");
 const confirmMessage = document.getElementById("confirm-message");
 const confirmCancel = document.getElementById("confirm-cancel");
 const confirmOk = document.getElementById("confirm-ok");
+const confirmExport = document.getElementById("confirm-export");
 
 // ---------- CONFIRMATION MODAL ----------
 function showConfirm({ title, message, danger = false, showExport = false }) {
