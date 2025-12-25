@@ -49,8 +49,9 @@ body {
   border: none;
   background: transparent;
   cursor: pointer;
-  font-size: 1.4rem;
+  font-size: 1.6rem;
   padding: 0.2rem 0.4rem;
+  color: var(--text); /* FIX: visible in dark mode */
 }
 
 /* Dropdown menu */
@@ -130,7 +131,7 @@ body {
   z-index: 50;
 }
 
-/* Modal & Preview base */
+/* Modal & Preview */
 .modal,
 .preview {
   position: fixed;
@@ -142,7 +143,7 @@ body {
   z-index: 100;
 }
 
-/* CRUCIAL FIX: when .hidden is present, force them to be gone */
+/* FIX: hidden must override modal/preview display */
 .modal.hidden,
 .preview.hidden,
 .dropdown.hidden {
