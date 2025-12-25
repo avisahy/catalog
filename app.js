@@ -107,6 +107,8 @@ document.addEventListener("click", (e) => {
   }
 });
 
+menuDropdown.addEventListener("click", (e) => { e.stopPropagation(); });
+
 // ---------- MODAL ----------
 fab.onclick = () => {
   if (viewOnlyMode) {
