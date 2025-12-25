@@ -2,83 +2,67 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1, minimum-scale=1"
-  />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Item Catalog</title>
 
-  <!-- PWA manifest -->
   <link rel="manifest" href="manifest.webmanifest" />
-
-  <!-- Theme colors -->
-  <meta name="theme-color" content="#050816" media="(prefers-color-scheme: dark)">
-  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
-
   <link rel="stylesheet" href="styles.css" />
 </head>
-<body>
-  <header class="app-header">
-    <div class="title-container">
-      <h1>Item Catalog</h1>
-      <p class="subtitle">Name + picture, stored locally</p>
-    </div>
 
-    <button id="dark-mode-toggle" class="icon-button" aria-label="Toggle dark mode">
-      🌙
-    </button>
+<body>
+
+  <!-- Floating Add Button -->
+  <button id="fab-add" class="fab">＋</button>
+
+  <!-- Add Item Modal -->
+  <div id="add-modal" class="modal hidden">
+    <div class="modal-content">
+      <h2>Add New Item</h2>
+
+      <form id="item-form">
+
+        <div class="form-group">
+          <label>Name</label>
+          <input type="text" id="item-name" required>
+        </div>
+
+        <div class="form-group">
+          <label>Picture</label>
+
+          <div id="file-picker" class="file-picker">
+            Click here to choose file
+          </div>
+          <input type="file" id="item-image" accept="image/*" hidden>
+        </div>
+
+        <button class="primary-btn" type="submit">Add</button>
+        <button type="button" id="close-modal" class="secondary-btn">Cancel</button>
+
+      </form>
+    </div>
+  </div>
+
+  <!-- Fullscreen Image Preview -->
+  <div id="preview-modal" class="preview hidden">
+    <img id="preview-img">
+  </div>
+
+  <header class="app-header">
+    <h1>Item Catalog</h1>
+
+    <input id="search" class="search" placeholder="Search items...">
+
+    <button id="dark-mode-toggle" class="icon-button">🌙</button>
   </header>
 
   <main class="app-main">
-    <section class="card">
-      <h2>Add new item</h2>
-      <form id="item-form" class="item-form">
-        <div class="form-group">
-          <label for="item-name">Name</label>
-          <input
-            type="text"
-            id="item-name"
-            name="item-name"
-            required
-            placeholder="e.g. Blue mug"
-          />
-        </div>
-
-        <div class="form-group">
-          <label for="item-image">Picture</label>
-          <input
-            type="file"
-            id="item-image"
-            name="item-image"
-            accept="image/*"
-            capture="environment"
-            required
-          />
-        </div>
-
-        <button type="submit" class="primary-btn">
-          Add item
-        </button>
-      </form>
-    </section>
-
-    <section class="card">
-      <div class="items-header">
-        <h2>Your items</h2>
-        <button id="clear-items" class="secondary-btn small">
-          Clear all
-        </button>
-      </div>
-      <div id="items-grid" class="items-grid">
-        <!-- items will render here -->
-      </div>
-    </section>
+    <div id="items-grid" class="items-grid"></div>
   </main>
 
   <footer class="app-footer">
-    <small>Offline-ready PWA · Items saved in this browser</small>
+    <small>Offline-ready PWA</small>
   </footer>
 
-  <script src="app.js" defer></script>
+  <script src="app.js"></script>
 </body>
 </html>
