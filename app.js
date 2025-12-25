@@ -25,7 +25,7 @@ const exportBtn = document.getElementById("export-btn");
 const toggleDarkBtn = document.getElementById("toggle-dark");
 const returnBtn = document.getElementById("return-btn");
 
-// ---------- Theme ----------
+// ---------- THEME ----------
 function applyTheme(theme) {
   document.body.classList.toggle("dark", theme === "dark");
 }
@@ -41,7 +41,7 @@ toggleDarkBtn.onclick = () => {
   localStorage.setItem(STORAGE_KEY_THEME, newTheme);
 };
 
-// ---------- Menu ----------
+// ---------- MENU ----------
 menuBtn.onclick = (e) => {
   e.stopPropagation();
   menuDropdown.classList.toggle("hidden");
@@ -53,7 +53,7 @@ document.addEventListener("click", (e) => {
   }
 });
 
-// ---------- Modal ----------
+// ---------- MODAL ----------
 fab.onclick = () => {
   if (viewOnlyMode) {
     alert("Cannot add items in view-only mode");
@@ -64,7 +64,7 @@ fab.onclick = () => {
 
 closeModal.onclick = () => addModal.classList.add("hidden");
 
-// ---------- Custom file picker ----------
+// ---------- CUSTOM FILE PICKER ----------
 filePicker.onclick = () => fileInput.click();
 
 fileInput.onchange = () => {
@@ -73,7 +73,7 @@ fileInput.onchange = () => {
     : "Click here to choose file";
 };
 
-// ---------- Load & Save ----------
+// ---------- LOAD & SAVE ----------
 function loadItems() {
   return JSON.parse(localStorage.getItem(STORAGE_KEY_ITEMS) || "[]");
 }
@@ -82,7 +82,7 @@ function saveItems(items) {
   localStorage.setItem(STORAGE_KEY_ITEMS, JSON.stringify(items));
 }
 
-// ---------- Render ----------
+// ---------- RENDER ----------
 function renderItems() {
   const items = viewOnlyMode ? importedItems : loadItems();
   itemsGrid.innerHTML = "";
@@ -112,7 +112,7 @@ function renderItems() {
   });
 }
 
-// ---------- Fullscreen preview ----------
+// ---------- PREVIEW ----------
 function showPreview(src) {
   previewImg.src = src;
   previewModal.classList.remove("hidden");
@@ -122,7 +122,7 @@ previewModal.onclick = () => {
   previewModal.classList.add("hidden");
 };
 
-// ---------- Add item ----------
+// ---------- ADD ITEM ----------
 function fileToBase64(file) {
   return new Promise((resolve) => {
     const reader = new FileReader();
@@ -164,7 +164,7 @@ itemForm.onsubmit = async (e) => {
   addModal.classList.add("hidden");
 };
 
-// ---------- Search ----------
+// ---------- SEARCH ----------
 search.oninput = () => {
   const q = search.value.toLowerCase();
   document.querySelectorAll(".item-card").forEach(card => {
@@ -173,7 +173,7 @@ search.oninput = () => {
   });
 };
 
-// ---------- Import / Export ----------
+// ---------- EXPORT ----------
 exportBtn.onclick = () => {
   const data = JSON.stringify(loadItems(), null, 2);
   const blob = new Blob([data], { type: "application/json" });
@@ -187,6 +187,7 @@ exportBtn.onclick = () => {
   URL.revokeObjectURL(url);
 };
 
+// ---------- IMPORT ----------
 importBtn.onclick = () => {
   const input = document.createElement("input");
   input.type = "file";
@@ -199,6 +200,7 @@ importBtn.onclick = () => {
     try {
       const text = await file.text();
       const parsed = JSON.parse(text);
+
       if (!Array.isArray(parsed)) {
         alert("Invalid file format");
         return;
@@ -212,7 +214,6 @@ importBtn.onclick = () => {
 
       renderItems();
     } catch (err) {
-      console.error(err);
       alert("Failed to import database");
     }
   };
@@ -220,6 +221,7 @@ importBtn.onclick = () => {
   input.click();
 };
 
+// ---------- RETURN TO MY DATABASE ----------
 returnBtn.onclick = () => {
   viewOnlyMode = false;
   importedItems = [];
@@ -230,12 +232,12 @@ returnBtn.onclick = () => {
   renderItems();
 };
 
-// ---------- Init ----------
+// ---------- INIT ----------
 loadTheme();
 
 addModal.classList.add("hidden");
 previewModal.classList.add("hidden");
 menuDropdown.classList.add("hidden");
-returnBtn.classList.add("hidden"); // FIX: hide on load
+returnBtn.classList.add("hidden"); // FORCE HIDE ON LOAD
 
 renderItems();
