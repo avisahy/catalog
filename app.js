@@ -353,7 +353,8 @@ makeMineBtn.onclick = async () => {
 
   if (choice === "cancel") return;
 
-  if (choice === "continue" || choice === "export") {
+  // Only export if user clicked "export"
+  if (choice === "export") {
     const data = JSON.stringify(loadItems(), null, 2);
     const blob = new Blob([data], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -366,10 +367,13 @@ makeMineBtn.onclick = async () => {
     URL.revokeObjectURL(url);
   }
 
-  saveItems(importedItems);
-
-  returnBtn.onclick();
+  // Replace database ONLY
+  if (choice === "continue" || choice === "export") {
+    saveItems(importedItems);
+    returnBtn.onclick();
+  }
 };
+
 
 
 // ---------- DELETE ALL ----------
