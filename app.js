@@ -206,7 +206,8 @@ importBtn.onclick = () => {
 
       importedItems = parsed;
       viewOnlyMode = true;
-      returnBtn.classList.remove("hidden");
+
+      returnBtn.classList.remove("hidden"); // FIX
       fab.style.display = "none";
 
       renderItems();
@@ -222,17 +223,19 @@ importBtn.onclick = () => {
 returnBtn.onclick = () => {
   viewOnlyMode = false;
   importedItems = [];
-  returnBtn.classList.add("hidden");
+
+  returnBtn.classList.add("hidden"); // FIX
   fab.style.display = "block";
+
   renderItems();
 };
 
 // ---------- Init ----------
 loadTheme();
 
-// Make sure everything is hidden on load, even if HTML got changed
 addModal.classList.add("hidden");
 previewModal.classList.add("hidden");
 menuDropdown.classList.add("hidden");
+returnBtn.classList.add("hidden"); // FIX: hide on load
 
 renderItems();
