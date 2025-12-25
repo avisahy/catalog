@@ -42,7 +42,8 @@ toggleDarkBtn.onclick = () => {
 };
 
 // ---------- Menu ----------
-menuBtn.onclick = () => {
+menuBtn.onclick = (e) => {
+  e.stopPropagation();
   menuDropdown.classList.toggle("hidden");
 };
 
@@ -54,7 +55,10 @@ document.addEventListener("click", (e) => {
 
 // ---------- Modal ----------
 fab.onclick = () => {
-  if (viewOnlyMode) return alert("Cannot add items in view-only mode");
+  if (viewOnlyMode) {
+    alert("Cannot add items in view-only mode");
+    return;
+  }
   addModal.classList.remove("hidden");
 };
 
@@ -89,6 +93,7 @@ function renderItems() {
 
     const img = document.createElement("img");
     img.src = item.imageData;
+    img.alt = item.name || "Item image";
     img.onclick = () => showPreview(item.imageData);
 
     const body = document.createElement("div");
@@ -113,7 +118,9 @@ function showPreview(src) {
   previewModal.classList.remove("hidden");
 }
 
-previewModal.onclick = () => previewModal.classList.add("hidden");
+previewModal.onclick = () => {
+  previewModal.classList.add("hidden");
+};
 
 // ---------- Add item ----------
 function fileToBase64(file) {
@@ -127,12 +134,18 @@ function fileToBase64(file) {
 itemForm.onsubmit = async (e) => {
   e.preventDefault();
 
-  if (viewOnlyMode) return alert("Cannot add items in view-only mode");
+  if (viewOnlyMode) {
+    alert("Cannot add items in view-only mode");
+    return;
+  }
 
   const name = itemNameInput.value.trim();
   const file = fileInput.files[0];
 
-  if (!name || !file) return alert("Name and picture required");
+  if (!name || !file) {
+    alert("Name and picture required");
+    return;
+  }
 
   const imageData = await fileToBase64(file);
 
@@ -170,6 +183,8 @@ exportBtn.onclick = () => {
   a.href = url;
   a.download = "my-database.json";
   a.click();
+
+  URL.revokeObjectURL(url);
 };
 
 importBtn.onclick = () => {
@@ -179,14 +194,26 @@ importBtn.onclick = () => {
 
   input.onchange = async () => {
     const file = input.files[0];
-    const text = await file.text();
-    importedItems = JSON.parse(text);
+    if (!file) return;
 
-    viewOnlyMode = true;
-    returnBtn.classList.remove("hidden");
-    fab.style.display = "none";
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      if (!Array.isArray(parsed)) {
+        alert("Invalid file format");
+        return;
+      }
 
-    renderItems();
+      importedItems = parsed;
+      viewOnlyMode = true;
+      returnBtn.classList.remove("hidden");
+      fab.style.display = "none";
+
+      renderItems();
+    } catch (err) {
+      console.error(err);
+      alert("Failed to import database");
+    }
   };
 
   input.click();
@@ -202,4 +229,10 @@ returnBtn.onclick = () => {
 
 // ---------- Init ----------
 loadTheme();
+
+// Make sure everything is hidden on load, even if HTML got changed
+addModal.classList.add("hidden");
+previewModal.classList.add("hidden");
+menuDropdown.classList.add("hidden");
+
 renderItems();
