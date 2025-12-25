@@ -74,5 +74,11 @@
   </footer>
 
   <script src="app.js"></script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/catalog/service-worker.js");
+    }
+  </script>
+
 </body>
 </html>
