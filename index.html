@@ -8,6 +8,10 @@
   <meta name="theme-color" content="#121212" />
   <link rel="icon" href="icons/icon-192.png" type="image/png" />
   <link rel="stylesheet" href="style.css" />
+
+  <!-- Load main script as ES module -->
+  <script type="module" src="script.js"></script>
+
   <script>
     // Minimal inline check to add dark or light before CSS to reduce FOUC
     (function () {
@@ -291,9 +295,6 @@
     <span id="snackbar-message"></span>
     <button id="snackbar-action"></button>
   </div>
-
-  <!-- Load ONLY script.js as a module -->
-  <script type="module" src="script.js"></script>
 
 </body>
 </html>
