@@ -2,353 +2,272 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+  />
   <title>Catalog PWA</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-
-  <!-- Theme color (updated dynamically by JS as well) -->
-  <meta name="theme-color" content="#121212" id="meta-theme-color" />
 
   <link rel="manifest" href="manifest.json" />
-  <link rel="icon" href="icons/icon-192.png" type="image/png" />
-
   <link rel="stylesheet" href="style.css" />
+
+  <meta name="theme-color" content="#121212" />
+  <link rel="icon" href="icons/icon-192.png" />
+
+  <script>
+    // Theme + layout + text size early apply to avoid flash
+    (function applyInitialPreferences() {
+      try {
+        const prefs = JSON.parse(localStorage.getItem("catalog_prefs") || "{}");
+        if (prefs.theme) document.documentElement.dataset.theme = prefs.theme;
+        if (prefs.mode) document.documentElement.dataset.mode = prefs.mode;
+        if (prefs.layout) document.documentElement.dataset.layout = prefs.layout;
+        if (prefs.textSize)
+          document.documentElement.dataset.textSize = prefs.textSize;
+      } catch (e) {}
+    })();
+  </script>
 </head>
 <body>
-  <!-- App root -->
-  <div id="app" class="app">
-
-    <!-- Top bar -->
-    <header class="top-bar">
-      <div class="top-bar-left">
-        <button id="logo-button" class="logo-button" title="Go home">
-          <span class="logo-3d">C</span>
-          <span class="logo-text">Catalog</span>
-        </button>
+  <div id="app">
+    <header class="app-header">
+      <div class="logo-container" role="button" tabindex="0" id="logoHome">
+        <div class="logo-3d">C</div>
+        <span class="logo-text">Catalog</span>
       </div>
-      <div class="top-bar-center">
+
+      <div class="header-center">
         <div class="search-container">
           <input
-            id="search-input"
-            type="search"
-            placeholder="Search by name or location"
+            id="searchInput"
+            type="text"
+            placeholder="Search by name or location..."
           />
-          <button id="voice-search-btn" class="icon-btn" title="Voice search">
-            🎤
+          <button id="voiceSearchBtn" class="icon-btn" title="Voice search">
+            🎙
           </button>
         </div>
       </div>
-      <div class="top-bar-right">
-        <button id="favorites-toggle" class="icon-btn" title="Filter favorites">
+
+      <div class="header-actions">
+        <button id="favoritesFilterBtn" class="icon-btn" title="Filter favorites">
           ★
         </button>
-        <button id="batch-toggle" class="icon-btn" title="Batch actions">
-          ☑
-        </button>
-        <button id="settings-open-btn" class="icon-btn" title="Settings">
-          ⚙
-        </button>
-        <div id="offline-indicator" class="offline-indicator" title="Offline">
-          ●
+
+        <label class="switch" title="Toggle dark / light mode">
+          <input type="checkbox" id="modeToggle" />
+          <span class="slider"></span>
+        </label>
+
+        <div class="offline-indicator" id="offlineIndicator" title="Offline">
+          ⭕
         </div>
       </div>
     </header>
 
-    <!-- Page container with animated transitions -->
-    <main class="page-container">
-      <!-- Home / Catalog page -->
-      <section id="page-home" class="page page-active" data-page="home">
-        <!-- Skeleton loading -->
-        <div id="skeleton-container" class="skeleton-container hidden">
-          <div class="skeleton-card"></div>
-          <div class="skeleton-card"></div>
-          <div class="skeleton-card"></div>
-        </div>
+    <nav class="bottom-nav">
+      <button class="nav-btn active" data-view="homeView">Home</button>
+      <button class="nav-btn" data-view="statsView">Stats</button>
+      <button class="nav-btn" data-view="settingsView">Settings</button>
+      <button class="nav-btn" data-view="backupView">Backup</button>
+    </nav>
 
-        <!-- 3D grid -->
-        <div id="catalog-grid" class="grid grid-3-col"></div>
+    <main id="mainViews">
+      <!-- HOME VIEW -->
+      <section id="homeView" class="view active">
+        <div id="skeletonGrid" class="card-grid skeleton-grid"></div>
+        <div id="cardGrid" class="card-grid hidden"></div>
 
-        <!-- Empty state -->
-        <div id="empty-state" class="empty-state hidden">
-          <p>No items yet.</p>
-          <p>Tap the + button to add your first item.</p>
+        <div class="batch-toolbar hidden" id="batchToolbar">
+          <span id="batchCount">0 selected</span>
+          <button id="batchFavoriteBtn">Favorite</button>
+          <button id="batchDeleteBtn">Delete</button>
+          <button id="batchExportBtn">Export</button>
+          <button id="batchShareBtn">Share</button>
+          <button id="batchCancelBtn">Cancel</button>
         </div>
       </section>
 
-      <!-- Settings page -->
-      <section id="page-settings" class="page" data-page="settings">
+      <!-- STATS VIEW -->
+      <section id="statsView" class="view">
+        <h2>Statistics</h2>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">Total items</div>
+            <div class="stat-value" id="statTotalItems">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Favorites</div>
+            <div class="stat-value" id="statFavorites">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Last backup</div>
+            <div class="stat-value" id="statLastBackup">Never</div>
+          </div>
+        </div>
+        <h3>Recently added</h3>
+        <ul id="recentTimeline" class="timeline"></ul>
+      </section>
+
+      <!-- SETTINGS VIEW -->
+      <section id="settingsView" class="view">
         <h2>Settings</h2>
 
         <div class="settings-group">
-          <h3>Appearance</h3>
-          <div class="settings-row">
-            <label for="theme-select">Color theme</label>
-            <select id="theme-select">
-              <option value="dark">Dark</option>
-              <option value="light">Light</option>
-              <option value="blue">Blue</option>
-              <option value="purple">Purple</option>
-            </select>
-          </div>
-
-          <div class="settings-row">
-            <span>Mode</span>
-            <label class="switch">
-              <input type="checkbox" id="dark-mode-toggle" />
-              <span class="slider"></span>
-            </label>
-          </div>
-
-          <div class="settings-row">
-            <label for="text-size-select">Text size</label>
-            <select id="text-size-select">
-              <option value="small">Small</option>
-              <option value="medium" selected>Medium</option>
-              <option value="large">Large</option>
-            </select>
-          </div>
-
-          <div class="settings-row">
-            <label for="layout-select">Home layout</label>
-            <select id="layout-select">
-              <option value="grid-2">2 columns</option>
-              <option value="grid-3" selected>3 columns</option>
-              <option value="grid-4">4 columns</option>
-            </select>
+          <h3>Theme</h3>
+          <div class="chip-group" id="themeChips">
+            <button data-theme="blue" class="chip">Blue</button>
+            <button data-theme="purple" class="chip">Purple</button>
+            <button data-theme="green" class="chip">Green</button>
+            <button data-theme="orange" class="chip">Orange</button>
           </div>
         </div>
 
         <div class="settings-group">
-          <h3>Backup & Export</h3>
-          <div class="settings-row">
-            <button id="export-all-btn" class="primary-btn">Export catalog</button>
-            <button id="import-btn" class="secondary-btn">Import catalog</button>
-            <input id="import-file-input" type="file" accept="application/json" hidden />
+          <h3>Layout</h3>
+          <div class="chip-group" id="layoutChips">
+            <button data-layout="2" class="chip">2 columns</button>
+            <button data-layout="3" class="chip">3 columns</button>
+            <button data-layout="4" class="chip">4 columns</button>
           </div>
-          <div class="settings-row">
-            <button id="backup-drive-btn" class="secondary-btn">
-              Manual backup (Google Drive)
-            </button>
+        </div>
+
+        <div class="settings-group">
+          <h3>Text size</h3>
+          <div class="chip-group" id="textSizeChips">
+            <button data-size="small" class="chip">Small</button>
+            <button data-size="medium" class="chip">Medium</button>
+            <button data-size="large" class="chip">Large</button>
           </div>
-          <div class="settings-row">
-            <label for="backup-interval-select">Auto-backup interval</label>
-            <select id="backup-interval-select">
-              <option value="1">Every 1 day</option>
-              <option value="3">Every 3 days</option>
-              <option value="7">Every 7 days</option>
-            </select>
-          </div>
-          <div class="settings-row">
-            <button id="delete-all-btn" class="danger-btn">
-              Delete all data
-            </button>
-          </div>
+        </div>
+
+        <div class="settings-group">
+          <h3>Danger zone</h3>
+          <button id="deleteAllBtn" class="danger-btn">
+            Delete all data
+          </button>
         </div>
       </section>
 
-      <!-- Stats page -->
-      <section id="page-stats" class="page" data-page="stats">
-        <h2>Stats</h2>
-        <div class="stats-grid">
-          <div class="stat-card">
-            <span class="stat-label">Total items</span>
-            <span id="stat-total-items" class="stat-value">0</span>
-          </div>
-          <div class="stat-card">
-            <span class="stat-label">Favorites</span>
-            <span id="stat-favorites" class="stat-value">0</span>
-          </div>
+      <!-- BACKUP VIEW -->
+      <section id="backupView" class="view">
+        <h2>Backup & Sync</h2>
+
+        <div class="settings-group">
+          <h3>Manual backup</h3>
+          <button id="exportAllBtn">Export all as JSON</button>
+          <button id="exportAllToWhatsAppBtn">
+            Share all (WhatsApp / QR / link)
+          </button>
         </div>
 
-        <h3>Recently added</h3>
-        <ul id="recent-list" class="recent-list"></ul>
+        <div class="settings-group">
+          <h3>Import</h3>
+          <input
+            type="file"
+            id="importFileInput"
+            accept="application/json"
+            hidden
+          />
+          <button id="importBtn">Import from JSON</button>
+          <div id="importSummary" class="import-summary"></div>
+        </div>
+
+        <div class="settings-group">
+          <h3>Backup reminders</h3>
+          <p>
+            Auto‑backup runs daily and keeps only older backups in local
+            storage. You’ll see reminders if you haven’t backed up recently.
+          </p>
+          <button id="forceBackupCheckBtn">Check backup status</button>
+        </div>
       </section>
     </main>
 
-    <!-- Bottom navigation -->
-    <nav class="bottom-nav">
-      <button data-nav="home" class="bottom-nav-btn bottom-nav-btn-active">
-        🏠
-        <span>Home</span>
-      </button>
-      <button data-nav="stats" class="bottom-nav-btn">
-        📊
-        <span>Stats</span>
-      </button>
-      <button data-nav="settings" class="bottom-nav-btn">
-        ⚙
-        <span>Settings</span>
-      </button>
-    </nav>
+    <!-- ITEM PREVIEW MODAL -->
+    <div id="previewOverlay" class="overlay hidden">
+      <div class="preview-modal">
+        <button id="previewCloseBtn" class="close-btn">✕</button>
 
-    <!-- FAB for add -->
-    <button id="fab-add" class="fab" title="Add item">+</button>
-
-    <!-- Add / Edit item modal -->
-    <div id="item-modal" class="modal hidden">
-      <div class="modal-backdrop"></div>
-      <div class="modal-content modal-3d">
-        <header class="modal-header">
-          <h2 id="item-modal-title">Add item</h2>
-          <button id="item-modal-close" class="icon-btn">✕</button>
-        </header>
-        <div class="modal-body">
-          <form id="item-form">
-            <div class="form-row">
-              <label for="item-name">Name</label>
-              <input id="item-name" type="text" required maxlength="100" />
-            </div>
-            <div class="form-row">
-              <label for="item-location">Location</label>
-              <input id="item-location" type="text" required maxlength="100" />
-            </div>
-            <div class="form-row">
-              <label for="item-image">Image</label>
-              <input id="item-image" type="file" accept="image/*" />
-              <small>For edit without changing, leave empty.</small>
-            </div>
-          </form>
+        <div class="preview-image-container" id="previewImageContainer">
+          <img id="previewImage" src="" alt="Item" />
         </div>
-        <footer class="modal-footer">
-          <button id="item-save-btn" class="primary-btn">Save</button>
-        </footer>
-      </div>
-    </div>
 
-    <!-- Preview modal / page -->
-    <div id="preview-modal" class="modal hidden">
-      <div class="modal-backdrop"></div>
-      <div class="modal-content modal-3d preview-modal-content">
-        <header class="modal-header">
-          <button id="preview-back-btn" class="icon-btn">←</button>
-          <h2 id="preview-title">Item</h2>
-          <button id="preview-favorite-btn" class="icon-btn" title="Favorite">
-            ☆
-          </button>
-        </header>
-        <div class="modal-body preview-body">
-          <div class="preview-image-wrapper">
-            <img id="preview-image" src="" alt="Item image" />
-            <button id="preview-fullscreen-btn" class="icon-btn preview-fullscreen-btn">
-              ⛶
-            </button>
-          </div>
-          <div class="preview-info">
-            <p><strong>Name:</strong> <span id="preview-name"></span></p>
-            <p><strong>Location:</strong> <span id="preview-location"></span></p>
-          </div>
+        <div class="preview-content">
+          <h2 id="previewName"></h2>
+          <p id="previewLocation" class="preview-location"></p>
 
           <div class="preview-actions">
-            <button id="preview-export-item-btn" class="secondary-btn">
-              Export item
-            </button>
-            <button id="preview-share-whatsapp-btn" class="secondary-btn">
-              Share WhatsApp
-            </button>
-            <button id="preview-share-qr-btn" class="secondary-btn">
-              Share by QR
-            </button>
-            <button id="preview-share-link-btn" class="secondary-btn">
-              Share link
-            </button>
-            <button id="preview-delete-btn" class="danger-btn">
-              Delete
-            </button>
+            <button id="previewFavoriteBtn" class="icon-btn">★</button>
+            <button id="previewExportBtn">Export JSON</button>
+            <button id="previewWhatsAppBtn">WhatsApp</button>
+            <button id="previewQrBtn">QR</button>
+            <button id="previewLinkBtn">Preview link</button>
+            <button id="previewDeleteBtn" class="danger-btn">Delete</button>
           </div>
 
-          <div class="preview-swipe-hint">
-            Swipe left/right to move between items
-          </div>
+          <div class="preview-swipe-hint">Swipe left / right to navigate</div>
         </div>
       </div>
     </div>
 
-    <!-- Batch actions bar -->
-    <div id="batch-bar" class="batch-bar hidden">
-      <span id="batch-count">0 selected</span>
-      <div class="batch-actions">
-        <button id="batch-favorite-btn" class="icon-btn" title="Favorite selected">
-          ★
-        </button>
-        <button id="batch-export-btn" class="icon-btn" title="Export selected">
-          ⬇
-        </button>
-        <button id="batch-share-btn" class="icon-btn" title="Share selected">
-          🔗
-        </button>
-        <button id="batch-delete-btn" class="icon-btn" title="Delete selected">
-          🗑
-        </button>
+    <!-- QR MODAL -->
+    <div id="qrOverlay" class="overlay hidden">
+      <div class="qr-modal">
+        <button id="qrCloseBtn" class="close-btn">✕</button>
+        <h2>Share as QR</h2>
+        <canvas id="qrCanvas"></canvas>
       </div>
     </div>
 
-    <!-- QR modal (single / multi) -->
-    <div id="qr-modal" class="modal hidden">
-      <div class="modal-backdrop"></div>
-      <div class="modal-content modal-3d">
-        <header class="modal-header">
-          <h2>QR Code</h2>
-          <button id="qr-close-btn" class="icon-btn">✕</button>
-        </header>
-        <div class="modal-body">
-          <canvas id="qr-canvas" width="256" height="256"></canvas>
-          <p class="qr-note">Scan with another device to import or view.</p>
+    <!-- ADD ITEM FAB + DIALOG -->
+    <button id="fab" class="fab">＋</button>
+
+    <div id="addDialogOverlay" class="overlay hidden">
+      <div class="dialog">
+        <h2>Add new item</h2>
+        <label>
+          Name
+          <input type="text" id="addNameInput" />
+        </label>
+        <label>
+          Location
+          <input type="text" id="addLocationInput" />
+        </label>
+        <label>
+          Image
+          <input type="file" id="addImageInput" accept="image/*" />
+        </label>
+        <div class="dialog-actions">
+          <button id="addCancelBtn">Cancel</button>
+          <button id="addSaveBtn">Save</button>
         </div>
       </div>
     </div>
 
-    <!-- Import conflict dialog -->
-    <div id="import-conflict-modal" class="modal hidden">
-      <div class="modal-backdrop"></div>
-      <div class="modal-content modal-3d">
-        <header class="modal-header">
-          <h2>Duplicate detected</h2>
-        </header>
-        <div class="modal-body">
-          <p>Item already exists. How do you want to resolve?</p>
-          <div class="conflict-details">
-            <p><strong>Name:</strong> <span id="conflict-name"></span></p>
-            <p><strong>Location:</strong> <span id="conflict-location"></span></p>
-          </div>
+    <!-- IMPORT CONFLICT DIALOG -->
+    <div id="importConflictOverlay" class="overlay hidden">
+      <div class="dialog">
+        <h2>Import conflict</h2>
+        <p id="importConflictText"></p>
+        <div class="dialog-actions">
+          <button id="importKeepExistingBtn">Keep existing</button>
+          <button id="importKeepImportedBtn">Keep imported</button>
+          <button id="importSkipBtn">Skip</button>
         </div>
-        <footer class="modal-footer">
-          <button id="conflict-keep-existing-btn" class="secondary-btn">
-            Keep existing
-          </button>
-          <button id="conflict-keep-imported-btn" class="primary-btn">
-            Keep imported
-          </button>
-          <button id="conflict-skip-btn" class="secondary-btn">
-            Skip
-          </button>
-        </footer>
       </div>
     </div>
 
-    <!-- Import summary dialog -->
-    <div id="import-summary-modal" class="modal hidden">
-      <div class="modal-backdrop"></div>
-      <div class="modal-content modal-3d">
-        <header class="modal-header">
-          <h2>Import summary</h2>
-        </header>
-        <div class="modal-body">
-          <p>Imported: <span id="import-summary-imported">0</span></p>
-          <p>Skipped: <span id="import-summary-skipped">0</span></p>
-          <p>Replaced: <span id="import-summary-replaced">0</span></p>
-          <div id="import-summary-errors" class="import-errors hidden"></div>
-        </div>
-        <footer class="modal-footer">
-          <button id="import-summary-close-btn" class="primary-btn">
-            Close
-          </button>
-        </footer>
-      </div>
-    </div>
+    <!-- SNACKBAR -->
+    <div id="snackbar" class="snackbar"></div>
 
-    <!-- Undo snackbar -->
-    <div id="snackbar" class="snackbar hidden">
-      <span id="snackbar-message"></span>
-      <button id="snackbar-undo-btn" class="snackbar-btn">Undo</button>
+    <!-- INSTALL PROMPT BANNER -->
+    <div id="installBanner" class="install-banner hidden">
+      <span>Add Catalog to home screen?</span>
+      <div>
+        <button id="installLaterBtn">Later</button>
+        <button id="installNowBtn">Install</button>
+      </div>
     </div>
   </div>
 
