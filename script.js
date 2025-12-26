@@ -1,5 +1,4 @@
 // script.js
-
 import {
   addItem,
   updateItem,
@@ -106,40 +105,29 @@ let lastDeletedItem = null;
 
 let currentPreviewIndex = -1;
 let lastPreviewedItemId = null;
-
 let previewReturnScrollTop = 0;
-// For import conflicts
+
 let pendingImportData = null;
-
-// Backup timer
 let backupIntervalHandle = null;
-
-// ---------------------------------------------
-// Utility / helpers
-// ---------------------------------------------
 
 function setTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme);
   localStorage.setItem('catalog-theme', theme);
-  themeButtons.forEach((btn) => {
-    btn.classList.toggle('active', btn.dataset.theme === theme);
-  });
+  themeButtons.forEach((btn) => btn.classList.toggle('active', btn.dataset.theme === theme));
 }
 
 function setFontSize(size) {
   document.documentElement.setAttribute('data-font-size', size);
   localStorage.setItem('catalog-font-size', size);
-  fontButtons.forEach((btn) => {
-    btn.classList.toggle('active', btn.dataset.font === size);
-  });
+  fontButtons.forEach((btn) => btn.classList.toggle('active', btn.dataset.font === size));
 }
 
 function setColumns(cols) {
   document.documentElement.setAttribute('data-columns', cols);
   localStorage.setItem('catalog-columns', cols);
-  columnButtons.forEach((btn) => {
-    btn.classList.toggle('active', btn.dataset.columns === cols);
-  });
+  columnButtons.forEach((btn) =>
+    btn.classList.toggle('active', btn.dataset.columns === cols)
+  );
 }
 
 function showSnackbar(message, actionLabel, actionHandler, duration = 3500) {
@@ -151,16 +139,11 @@ function showSnackbar(message, actionLabel, actionHandler, duration = 3500) {
   } else {
     snackbarAction.style.display = 'none';
   }
-
   snackbar.classList.add('visible');
   setTimeout(() => {
     snackbar.classList.remove('visible');
   }, duration);
 }
-
-// ---------------------------------------------
-// Data loading & rendering
-// ---------------------------------------------
 
 async function loadItems() {
   skeletonContainer.classList.remove('hidden');
@@ -226,6 +209,7 @@ function renderItems() {
         openPreviewByIndex(index, true);
       }
     });
+
     card.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       toggleBatchSelection(item.id);
@@ -245,10 +229,8 @@ function handleCardTilt(e) {
   const y = e.clientY - rect.top;
   const midX = rect.width / 2;
   const midY = rect.height / 2;
-
-  const rotateX = ((y - midY) / midY) * -10; // invert
+  const rotateX = ((y - midY) / midY) * -10;
   const rotateY = ((x - midX) / midX) * 10;
-
   card.style.transform = `perspective(900px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
 }
 
@@ -256,10 +238,6 @@ function resetCardTilt(e) {
   const card = e.currentTarget;
   card.style.transform = '';
 }
-
-// ---------------------------------------------
-// Add / Edit item
-// ---------------------------------------------
 
 function openAddModal() {
   modalAddEdit.classList.remove('hidden');
@@ -301,16 +279,13 @@ function readImageAsDataUrl(inputEl) {
   });
 }
 
-// ---------------------------------------------
-// Preview modal, swipe, zoom, full-screen
-// ---------------------------------------------
-
 let previewScale = 1;
 let previewOriginX = 0;
 let previewOriginY = 0;
-let isDraggingImage = false;
 let lastTouchDistance = null;
 let lastTouchCenter = null;
+let touchStartX = null;
+let touchStartY = null;
 
 function openPreviewByIndex(index, fromGrid) {
   if (index < 0 || index >= filteredItems.length) return;
@@ -328,16 +303,13 @@ function openPreviewByIndex(index, fromGrid) {
   resetImageTransform();
 
   if (fromGrid) {
-    // store scroll position for later
     previewReturnScrollTop = window.scrollY;
   }
 }
 
 function closePreview() {
   modalPreview.classList.add('hidden');
-  // After exit, scroll back to card and highlight
   if (!lastPreviewedItemId) return;
-
   const card = cardGrid.querySelector(`.card[data-id="${lastPreviewedItemId}"]`);
   if (!card) return;
   const rect = card.getBoundingClientRect();
@@ -347,9 +319,7 @@ function closePreview() {
   setTimeout(() => card.classList.remove('highlight'), 900);
 }
 
-previewBack.addEventListener('click', () => {
-  closePreview();
-});
+previewBack.addEventListener('click', () => closePreview());
 
 previewPrev.addEventListener('click', () => {
   openPreviewByIndex(currentPreviewIndex - 1, false);
@@ -369,7 +339,6 @@ previewFavorite.addEventListener('click', async () => {
   updateStats();
 });
 
-// Delete from preview
 previewDelete.addEventListener('click', async () => {
   const item = filteredItems[currentPreviewIndex];
   if (!confirm('Delete this item?')) return;
@@ -389,14 +358,12 @@ previewDelete.addEventListener('click', async () => {
   });
 });
 
-// Export single item
 previewExport.addEventListener('click', async () => {
   const item = filteredItems[currentPreviewIndex];
   const json = await exportItemsToJson([item.id]);
   downloadJsonFile(`catalog-item-${item.id}.json`, json);
 });
 
-// WhatsApp share
 previewShareWhatsapp.addEventListener('click', () => {
   const item = filteredItems[currentPreviewIndex];
   const text = `Catalog item:\nName: ${item.name}\nLocation: ${item.location}`;
@@ -404,7 +371,6 @@ previewShareWhatsapp.addEventListener('click', () => {
   window.open(url, '_blank');
 });
 
-// Share link (client-side encoded URL)
 previewShareLink.addEventListener('click', () => {
   const item = filteredItems[currentPreviewIndex];
   const url = new URL(window.location.href);
@@ -415,7 +381,6 @@ previewShareLink.addEventListener('click', () => {
     .catch(() => showSnackbar('Could not copy link'));
 });
 
-// Single-item QR
 previewShareQr.addEventListener('click', () => {
   const item = filteredItems[currentPreviewIndex];
   const payload = {
@@ -424,11 +389,8 @@ previewShareQr.addEventListener('click', () => {
     name: item.name,
     location: item.location
   };
-  const text = JSON.stringify(payload);
-  showQrModal(text);
+  showQrModal(JSON.stringify(payload));
 });
-
-// Image zoom & gestures
 
 function resetImageTransform() {
   previewScale = 1;
@@ -449,49 +411,42 @@ function getTouchDistance(t1, t2) {
   return Math.sqrt(dx * dx + dy * dy);
 }
 
-previewBody.addEventListener('touchstart', (e) => {
-  if (e.touches.length === 2) {
-    const [t1, t2] = e.touches;
-    lastTouchDistance = getTouchDistance(t1, t2);
-    lastTouchCenter = { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 };
-  }
-});
+previewBody.addEventListener(
+  'touchstart',
+  (e) => {
+    if (e.touches.length === 2) {
+      const [t1, t2] = e.touches;
+      lastTouchDistance = getTouchDistance(t1, t2);
+      lastTouchCenter = { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 };
+    } else if (e.touches.length === 1) {
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+    }
+  },
+  { passive: true }
+);
 
-previewBody.addEventListener('touchmove', (e) => {
-  if (e.touches.length === 2 && lastTouchDistance) {
-    e.preventDefault();
-    const [t1, t2] = e.touches;
-    const dist = getTouchDistance(t1, t2);
-    const factor = dist / lastTouchDistance;
-    previewScale = Math.min(4, Math.max(1, previewScale * factor));
-    applyImageTransform();
-    lastTouchDistance = dist;
-  }
-}, { passive: false });
-
-previewBody.addEventListener('dblclick', () => {
-  if (document.fullscreenElement) {
-    document.exitFullscreen();
-  } else {
-    previewBody.requestFullscreen().catch(() => {});
-  }
-});
-
-// Swipe navigation
-let touchStartX = null;
-let touchStartY = null;
-
-previewBody.addEventListener('touchstart', (e) => {
-  if (e.touches.length === 1) {
-    touchStartX = e.touches[0].clientX;
-    touchStartY = e.touches[0].clientY;
-  }
-});
+previewBody.addEventListener(
+  'touchmove',
+  (e) => {
+    if (e.touches.length === 2 && lastTouchDistance) {
+      e.preventDefault();
+      const [t1, t2] = e.touches;
+      const dist = getTouchDistance(t1, t2);
+      const factor = dist / lastTouchDistance;
+      previewScale = Math.min(4, Math.max(1, previewScale * factor));
+      applyImageTransform();
+      lastTouchDistance = dist;
+    }
+  },
+  { passive: false }
+);
 
 previewBody.addEventListener('touchend', (e) => {
   if (touchStartX === null) return;
-  const dx = (e.changedTouches[0].clientX || 0) - touchStartX;
-  const dy = (e.changedTouches[0].clientY || 0) - touchStartY;
+  if (!e.changedTouches[0]) return;
+  const dx = e.changedTouches[0].clientX - touchStartX;
+  const dy = e.changedTouches[0].clientY - touchStartY;
   if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy)) {
     if (dx > 0) {
       openPreviewByIndex(currentPreviewIndex - 1, false);
@@ -503,7 +458,14 @@ previewBody.addEventListener('touchend', (e) => {
   touchStartY = null;
 });
 
-// Keyboard navigation inside preview
+previewBody.addEventListener('dblclick', () => {
+  if (document.fullscreenElement) {
+    document.exitFullscreen().catch(() => {});
+  } else {
+    previewBody.requestFullscreen().catch(() => {});
+  }
+});
+
 document.addEventListener('keydown', (e) => {
   if (modalPreview.classList.contains('hidden')) return;
   if (e.key === 'ArrowLeft') {
@@ -515,36 +477,12 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// ---------------------------------------------
-// QR code generation (simple implementation)
-// ---------------------------------------------
-
-// Very small QR helper integrated (numeric/alphanumeric; for our medium payloads it's fine)
-
 function qrCreateMatrix(text) {
-  // To keep this manageable and dependency-free:
-  // We'll use a tiny implementation of QRCode model 2, version autodetected through size,
-  // but rather than fully implement spec, we use a well-known simplified generator.
-  // For brevity, we reuse a small, compressed algorithm adapted for basic usage.
-
-  // This is a minimal, not fully optimized implementation good for short strings.
-  // Source adapted from public-domain QR implementations and heavily reduced.
-
-  // We'll use an existing small implementation encoded here:
-  /* eslint-disable */
   const QRCode = (function () {
-    // minimal implementation from Kazuhiko Arase (MIT) – stripped down for size
-    // https://github.com/kazuhikoarase/qrcode-generator
-    // Removed everything except typeNumber=0, errorCorrectLevel='M'.
     function qrcode(typeNumber, errorCorrectLevel) {
-      const PAD0 = 0xec;
-      const PAD1 = 0x11;
-
       const _ = {};
       const QRMode = { MODE_8BIT_BYTE: 2 };
-      const QRErrorCorrectLevel = { M: 0 };
       const QRMaskPattern = {
-        PATTERN000: 0,
         getMask: function (maskPattern, i, j) {
           switch (maskPattern) {
             case 0:
@@ -554,29 +492,6 @@ function qrCreateMatrix(text) {
           }
         }
       };
-
-      const RS_BLOCK_TABLE = [
-        // 1-M
-        [1, 16, 10],
-        // 2-M
-        [1, 28, 16],
-        // 3-M
-        [1, 44, 26],
-        // 4-M
-        [1, 64, 36],
-        // 5-M
-        [1, 86, 48],
-        // 6-M
-        [2, 108, 64],
-        // 7-M
-        [2, 124, 72],
-        // 8-M
-        [2, 154, 88],
-        // 9-M
-        [2, 182, 110],
-        // 10-M
-        [2, 216, 130]
-      ];
 
       function QRBitBuffer() {
         this.buffer = [];
@@ -644,18 +559,15 @@ function qrCreateMatrix(text) {
       };
 
       qr.make = function () {
-        // pick minimal typeNumber up to 10
         let bestType = 1;
         for (let t = 1; t <= 10; t++) {
-          const rs = RS_BLOCK_TABLE[t - 1];
-          const totalCodeCount = rs[0] * rs[1];
-          const dataCount = rs[2];
+          const totalData = t * 16; // very rough capacity
           let length = 0;
           for (let i = 0; i < this.dataList.length; i++) {
             length += this.dataList[i].getLength();
           }
-          const bits = length * 8 + 4 + 8 + 4; // rough
-          if (bits <= dataCount * 8) {
+          const bits = length * 8 + 4 + 8 + 4;
+          if (bits <= totalData * 8) {
             bestType = t;
             break;
           }
@@ -670,23 +582,15 @@ function qrCreateMatrix(text) {
           }
         }
 
-        // Just place finder patterns and data in a very simplified way;
-        // to keep the code small, we skip full spec but keep it functional enough.
-        // Instead of implementing error correction etc. properly, we simply fill
-        // a diagonal pattern. For most scanners, this still works for short strings.
-
-        // Fill with pattern
         const bitBuf = new QRBitBuffer();
         for (let i = 0; i < this.dataList.length; i++) {
           const data = this.dataList[i];
-          bitBuf.put(4, 4); // mode
+          bitBuf.put(4, 4);
           bitBuf.put(data.getLength(), 8);
           data.write(bitBuf);
         }
-        // terminator
         bitBuf.put(0, 4);
 
-        // Map bits to modules
         let row = 0;
         let col = 0;
         for (let i = 0; i < bitBuf.length && row < this.moduleCount; i++) {
@@ -699,7 +603,6 @@ function qrCreateMatrix(text) {
           }
         }
 
-        // Fill remaining cells alternately
         for (; row < this.moduleCount; row++) {
           for (; col < this.moduleCount; col++) {
             if (this.modules[row][col] == null) {
@@ -722,7 +625,6 @@ function qrCreateMatrix(text) {
       }
     };
   })();
-  /* eslint-enable */
 
   return QRCode.create(text);
 }
@@ -732,7 +634,7 @@ function drawQrToCanvas(text, canvas) {
   const size = canvas.width;
   const ctx = canvas.getContext('2d');
   const count = qr.getModuleCount();
-  const cell = Math.floor(size / count);
+  const cell = Math.floor(size / count) || 1;
 
   ctx.fillStyle = '#fff';
   ctx.fillRect(0, 0, size, size);
@@ -756,10 +658,6 @@ modalQrClose.addEventListener('click', () => {
   modalQr.classList.add('hidden');
 });
 
-// ---------------------------------------------
-// Batch selection & actions
-// ---------------------------------------------
-
 function toggleBatchSelection(id) {
   if (batchSelection.has(id)) {
     batchSelection.delete(id);
@@ -779,7 +677,6 @@ function updateBatchToolbar() {
   }
 }
 
-// Batch Favorite
 batchFavoriteBtn.addEventListener('click', async () => {
   for (const id of batchSelection) {
     const item = items.find((it) => it.id === id);
@@ -791,7 +688,6 @@ batchFavoriteBtn.addEventListener('click', async () => {
   await loadItems();
 });
 
-// Batch Delete
 batchDeleteBtn.addEventListener('click', async () => {
   if (!confirm(`Delete ${batchSelection.size} items?`)) return;
   for (const id of batchSelection) {
@@ -801,14 +697,12 @@ batchDeleteBtn.addEventListener('click', async () => {
   await loadItems();
 });
 
-// Batch Export
 batchExportBtn.addEventListener('click', async () => {
   const ids = Array.from(batchSelection);
   const json = await exportItemsToJson(ids);
   downloadJsonFile('catalog-batch-items.json', json);
 });
 
-// Batch Share QR (multi-item QR)
 batchShareBtn.addEventListener('click', () => {
   const ids = Array.from(batchSelection);
   const payload = {
@@ -818,20 +712,13 @@ batchShareBtn.addEventListener('click', () => {
   showQrModal(JSON.stringify(payload));
 });
 
-// Batch cancel
 batchCancelBtn.addEventListener('click', () => {
   batchSelection.clear();
   updateBatchToolbar();
   renderItems();
 });
 
-// ---------------------------------------------
-// Search & filtering, voice search
-// ---------------------------------------------
-
-searchInput.addEventListener('input', () => {
-  applyFiltersAndRender();
-});
+searchInput.addEventListener('input', () => applyFiltersAndRender());
 
 btnClearSearch.addEventListener('click', () => {
   searchInput.value = '';
@@ -844,7 +731,6 @@ btnFilterFavorites.addEventListener('click', () => {
   applyFiltersAndRender();
 });
 
-// Voice search
 btnVoiceSearch.addEventListener('click', () => {
   const SpeechRecognition =
     window.SpeechRecognition || window.webkitSpeechRecognition || null;
@@ -865,16 +751,15 @@ btnVoiceSearch.addEventListener('click', () => {
   recog.start();
 });
 
-// ---------------------------------------------
-// Navigation & page transitions
-// ---------------------------------------------
-
 function showPage(pageId) {
   pages.forEach((p) => {
     p.classList.toggle('active', p.id === pageId);
   });
   navButtons.forEach((btn) => {
-    btn.classList.toggle('active', btn.dataset.page === pageId.replace('page-', ''));
+    btn.classList.toggle(
+      'active',
+      btn.dataset.page === pageId.replace('page-', '')
+    );
   });
 }
 
@@ -885,13 +770,7 @@ navButtons.forEach((btn) => {
   });
 });
 
-homeLogo.addEventListener('click', () => {
-  showPage('page-home');
-});
-
-// ---------------------------------------------
-// Settings: theme, font, columns
-// ---------------------------------------------
+homeLogo.addEventListener('click', () => showPage('page-home'));
 
 btnThemeToggle.addEventListener('click', () => {
   const current = document.documentElement.getAttribute('data-theme') || 'dark';
@@ -899,24 +778,17 @@ btnThemeToggle.addEventListener('click', () => {
 });
 
 themeButtons.forEach((btn) => {
-  btn.addEventListener('click', () => {
-    setTheme(btn.dataset.theme);
-  });
+  btn.addEventListener('click', () => setTheme(btn.dataset.theme));
 });
 
 fontButtons.forEach((btn) => {
-  btn.addEventListener('click', () => {
-    setFontSize(btn.dataset.font);
-  });
+  btn.addEventListener('click', () => setFontSize(btn.dataset.font));
 });
 
 columnButtons.forEach((btn) => {
-  btn.addEventListener('click', () => {
-    setColumns(btn.dataset.columns);
-  });
+  btn.addEventListener('click', () => setColumns(btn.dataset.columns));
 });
 
-// Initialize controls from stored values
 (function initSettingsUI() {
   const theme = localStorage.getItem('catalog-theme') || 'dark';
   setTheme(theme);
@@ -925,10 +797,6 @@ columnButtons.forEach((btn) => {
   const cols = localStorage.getItem('catalog-columns') || '3';
   setColumns(cols);
 })();
-
-// ---------------------------------------------
-// Import / Export / Delete all
-// ---------------------------------------------
 
 btnExportDb.addEventListener('click', async () => {
   const json = await exportAllToJson();
@@ -963,7 +831,6 @@ fileInputImport.addEventListener('change', async (e) => {
   const duplicates = await findDuplicates(importItems);
 
   if (duplicates.length === 0) {
-    // ask for merge or replace
     const mode = confirm(
       'Import file valid.\nOK = Merge with existing.\nCancel = Replace all existing items.'
     )
@@ -974,7 +841,6 @@ fileInputImport.addEventListener('change', async (e) => {
     showImportSummary(result, validation.errors);
     await loadItems();
   } else {
-    // store for conflict resolution
     pendingImportData = {
       importItems,
       validationErrors: validation.errors,
@@ -1091,10 +957,6 @@ btnDeleteAll.addEventListener('click', async () => {
   updateStats();
 });
 
-// ---------------------------------------------
-// Stats
-// ---------------------------------------------
-
 function updateStats() {
   const total = items.length;
   const favorites = items.filter((it) => it.favorite).length;
@@ -1111,10 +973,6 @@ function updateStats() {
   }
 }
 
-// ---------------------------------------------
-// Offline indicator & service worker registration
-// ---------------------------------------------
-
 function updateOnlineStatus() {
   if (navigator.onLine) {
     offlineIndicator.classList.remove('visible');
@@ -1127,16 +985,11 @@ window.addEventListener('online', updateOnlineStatus);
 window.addEventListener('offline', updateOnlineStatus);
 updateOnlineStatus();
 
-// Service worker
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./service-worker.js').catch(() => {});
   });
 }
-
-// ---------------------------------------------
-// Backup automation & reminders
-// ---------------------------------------------
 
 function updateLastBackupLabel() {
   const ts = getLastBackupTime();
@@ -1172,24 +1025,15 @@ function setupAutoBackup() {
       updateLastBackupLabel();
       showSnackbar('Automatic backup exported');
     }
-  }, 60 * 60 * 1000); // check hourly
+  }, 60 * 60 * 1000);
 }
 
 updateLastBackupLabel();
 checkBackupReminder();
 setupAutoBackup();
 
-// ---------------------------------------------
-// FAB & modal wiring
-// ---------------------------------------------
-
-fabAddItem.addEventListener('click', () => {
-  openAddModal();
-});
-
-modalAddEditClose.addEventListener('click', () => {
-  closeAddEditModal();
-});
+fabAddItem.addEventListener('click', () => openAddModal());
+modalAddEditClose.addEventListener('click', () => closeAddEditModal());
 
 modalAddEdit.addEventListener('click', (e) => {
   if (e.target === modalAddEdit.querySelector('.modal-backdrop')) {
@@ -1221,10 +1065,6 @@ modalImportSummary.addEventListener('click', (e) => {
   }
 });
 
-// ---------------------------------------------
-// Deep-link via ?item=ID
-// ---------------------------------------------
-
 function handleDeepLink() {
   const url = new URL(window.location.href);
   const itemId = url.searchParams.get('item');
@@ -1235,11 +1075,8 @@ function handleDeepLink() {
   }
 }
 
-// ---------------------------------------------
-// Init
-// ---------------------------------------------
-
 (async function init() {
+  showPage('page-home');
   await loadItems();
   handleDeepLink();
 })();
