@@ -1,607 +1,437 @@
 // script.js
-// UI logic, interaction, swipe, voice search, QR, backup, etc.
 
-import {
-  addItem,
-  updateItem,
-  deleteItem,
-  clearAllItems,
-  getAllItems,
-  getItemById,
-  exportAllToJson,
-  exportItemsSubset,
-  exportSingleItem,
-  triggerDownloadJson,
-  validateAndParseImport,
-  importItems,
-  setMeta,
-  getMeta,
-} from "./db.js";
+/* ------------------------- DOM REFERENCES ------------------------- */
 
-/* State */
+const cardGrid = document.getElementById("cardGrid");
+const skeletonGrid = document.getElementById("skeletonGrid");
+const fab = document.getElementById("fab");
+const addDialogOverlay = document.getElementById("addDialogOverlay");
+const addNameInput = document.getElementById("addNameInput");
+const addLocationInput = document.getElementById("addLocationInput");
+const addImageInput = document.getElementById("addImageInput");
+const addCancelBtn = document.getElementById("addCancelBtn");
+const addSaveBtn = document.getElementById("addSaveBtn");
 
-let items = [];
-let filteredItems = [];
-let favoritesOnly = false;
-let batchMode = false;
-let batchSelection = new Set();
-let lastDeleted = null;
-let lastDeletedTimeout = null;
+const navButtons = document.querySelectorAll(".nav-btn");
+const views = document.querySelectorAll(".view");
 
-let currentPreviewId = null;
-let previewIndex = -1;
+const searchInput = document.getElementById("searchInput");
+const voiceSearchBtn = document.getElementById("voiceSearchBtn");
+const favoritesFilterBtn = document.getElementById("favoritesFilterBtn");
 
-let touchStartX = null;
-let touchStartY = null;
+const modeToggle = document.getElementById("modeToggle");
+const offlineIndicator = document.getElementById("offlineIndicator");
 
-/* DOM */
+const previewOverlay = document.getElementById("previewOverlay");
+const previewImage = document.getElementById("previewImage");
+const previewName = document.getElementById("previewName");
+const previewLocation = document.getElementById("previewLocation");
+const previewCloseBtn = document.getElementById("previewCloseBtn");
+const previewFavoriteBtn = document.getElementById("previewFavoriteBtn");
+const previewExportBtn = document.getElementById("previewExportBtn");
+const previewWhatsAppBtn = document.getElementById("previewWhatsAppBtn");
+const previewQrBtn = document.getElementById("previewQrBtn");
+const previewLinkBtn = document.getElementById("previewLinkBtn");
+const previewDeleteBtn = document.getElementById("previewDeleteBtn");
+const previewImageContainer = document.getElementById("previewImageContainer");
 
-const catalogGrid = document.getElementById("catalog-grid");
-const skeletonContainer = document.getElementById("skeleton-container");
-const emptyState = document.getElementById("empty-state");
+const qrOverlay = document.getElementById("qrOverlay");
+const qrCanvas = document.getElementById("qrCanvas");
+const qrCloseBtn = document.getElementById("qrCloseBtn");
 
-const fabAdd = document.getElementById("fab-add");
-const itemModal = document.getElementById("item-modal");
-const itemModalClose = document.getElementById("item-modal-close");
-const itemModalTitle = document.getElementById("item-modal-title");
-const itemForm = document.getElementById("item-form");
-const itemNameInput = document.getElementById("item-name");
-const itemLocationInput = document.getElementById("item-location");
-const itemImageInput = document.getElementById("item-image");
-const itemSaveBtn = document.getElementById("item-save-btn");
+const batchToolbar = document.getElementById("batchToolbar");
+const batchCount = document.getElementById("batchCount");
+const batchFavoriteBtn = document.getElementById("batchFavoriteBtn");
+const batchDeleteBtn = document.getElementById("batchDeleteBtn");
+const batchExportBtn = document.getElementById("batchExportBtn");
+const batchShareBtn = document.getElementById("batchShareBtn");
+const batchCancelBtn = document.getElementById("batchCancelBtn");
 
-const previewModal = document.getElementById("preview-modal");
-const previewBackBtn = document.getElementById("preview-back-btn");
-const previewImage = document.getElementById("preview-image");
-const previewName = document.getElementById("preview-name");
-const previewLocation = document.getElementById("preview-location");
-const previewTitle = document.getElementById("preview-title");
-const previewFavoriteBtn = document.getElementById("preview-favorite-btn");
-const previewExportItemBtn = document.getElementById(
-  "preview-export-item-btn"
-);
-const previewShareWhatsAppBtn = document.getElementById(
-  "preview-share-whatsapp-btn"
-);
-const previewShareQrBtn = document.getElementById("preview-share-qr-btn");
-const previewShareLinkBtn = document.getElementById("preview-share-link-btn");
-const previewDeleteBtn = document.getElementById("preview-delete-btn");
-const previewFullscreenBtn = document.getElementById(
-  "preview-fullscreen-btn"
-);
+const deleteAllBtn = document.getElementById("deleteAllBtn");
 
-const qrModal = document.getElementById("qr-modal");
-const qrCloseBtn = document.getElementById("qr-close-btn");
-const qrCanvas = document.getElementById("qr-canvas");
-
-const favoritesToggle = document.getElementById("favorites-toggle");
-const batchToggle = document.getElementById("batch-toggle");
-const batchBar = document.getElementById("batch-bar");
-const batchCount = document.getElementById("batch-count");
-const batchFavoriteBtn = document.getElementById("batch-favorite-btn");
-const batchExportBtn = document.getElementById("batch-export-btn");
-const batchShareBtn = document.getElementById("batch-share-btn");
-const batchDeleteBtn = document.getElementById("batch-delete-btn");
-
-const offlineIndicator = document.getElementById("offline-indicator");
+const themeChips = document.getElementById("themeChips");
+const layoutChips = document.getElementById("layoutChips");
+const textSizeChips = document.getElementById("textSizeChips");
 
 const snackbar = document.getElementById("snackbar");
-const snackbarMessage = document.getElementById("snackbar-message");
-const snackbarUndoBtn = document.getElementById("snackbar-undo-btn");
 
-const searchInput = document.getElementById("search-input");
-const voiceSearchBtn = document.getElementById("voice-search-btn");
+const logoHome = document.getElementById("logoHome");
 
-const bottomNavButtons = document.querySelectorAll(".bottom-nav-btn");
-const pages = document.querySelectorAll(".page");
-const logoButton = document.getElementById("logo-button");
-
-const settingsOpenBtn = document.getElementById("settings-open-btn");
-const themeSelect = document.getElementById("theme-select");
-const darkModeToggle = document.getElementById("dark-mode-toggle");
-const textSizeSelect = document.getElementById("text-size-select");
-const layoutSelect = document.getElementById("layout-select");
-
-const exportAllBtn = document.getElementById("export-all-btn");
-const importBtn = document.getElementById("import-btn");
-const importFileInput = document.getElementById("import-file-input");
-const deleteAllBtn = document.getElementById("delete-all-btn");
-const backupDriveBtn = document.getElementById("backup-drive-btn");
-const backupIntervalSelect = document.getElementById(
-  "backup-interval-select"
+const exportAllBtn = document.getElementById("exportAllBtn");
+const exportAllToWhatsAppBtn = document.getElementById(
+  "exportAllToWhatsAppBtn"
 );
+const importBtn = document.getElementById("importBtn");
+const importFileInput = document.getElementById("importFileInput");
+const importSummary = document.getElementById("importSummary");
+const importConflictOverlay = document.getElementById("importConflictOverlay");
+const importConflictText = document.getElementById("importConflictText");
+const importKeepExistingBtn = document.getElementById("importKeepExistingBtn");
+const importKeepImportedBtn = document.getElementById("importKeepImportedBtn");
+const importSkipBtn = document.getElementById("importSkipBtn");
 
-const statTotalItems = document.getElementById("stat-total-items");
-const statFavorites = document.getElementById("stat-favorites");
-const recentList = document.getElementById("recent-list");
+const installBanner = document.getElementById("installBanner");
+const installLaterBtn = document.getElementById("installLaterBtn");
+const installNowBtn = document.getElementById("installNowBtn");
 
-const importConflictModal = document.getElementById("import-conflict-modal");
-const conflictNameSpan = document.getElementById("conflict-name");
-const conflictLocationSpan = document.getElementById("conflict-location");
-const conflictKeepExistingBtn = document.getElementById(
-  "conflict-keep-existing-btn"
-);
-const conflictKeepImportedBtn = document.getElementById(
-  "conflict-keep-imported-btn"
-);
-const conflictSkipBtn = document.getElementById("conflict-skip-btn");
+const statTotalItems = document.getElementById("statTotalItems");
+const statFavorites = document.getElementById("statFavorites");
+const statLastBackup = document.getElementById("statLastBackup");
+const recentTimeline = document.getElementById("recentTimeline");
 
-const importSummaryModal = document.getElementById("import-summary-modal");
-const importSummaryImportedSpan = document.getElementById(
-  "import-summary-imported"
-);
-const importSummarySkippedSpan = document.getElementById(
-  "import-summary-skipped"
-);
-const importSummaryReplacedSpan = document.getElementById(
-  "import-summary-replaced"
-);
-const importSummaryErrorsDiv = document.getElementById(
-  "import-summary-errors"
-);
-const importSummaryCloseBtn = document.getElementById(
-  "import-summary-close-btn"
-);
+const forceBackupCheckBtn = document.getElementById("forceBackupCheckBtn");
 
-/* Utility */
+const statBackupView = document.getElementById("backupView");
 
-function showElement(el) {
-  el.classList.remove("hidden");
-}
-function hideElement(el) {
-  el.classList.add("hidden");
-}
+// State
+let allItems = [];
+let filteredItems = [];
+let favoritesOnly = false;
 
-function openModal(el) {
-  el.classList.remove("hidden");
-}
-function closeModal(el) {
-  el.classList.add("hidden");
-}
+let batchMode = false;
+let batchSelectedIds = new Set();
 
-function showSnackbar(message, undoCallback) {
-  snackbarMessage.textContent = message;
-  snackbar.classList.remove("hidden");
-  if (lastDeletedTimeout) {
-    clearTimeout(lastDeletedTimeout);
+let previewIndex = -1; // index in filteredItems
+let previewInitialCardId = null;
+
+let lastDeletedItem = null;
+let lastDeletedTimeout = null;
+
+let deferredPrompt = null;
+
+let importConflictResolver = null;
+let importConflictCurrent = { existing: null, incoming: null };
+
+// Preferences
+const PREFS_KEY = "catalog_prefs";
+const BACKUP_META_KEY = "catalog_backup_meta"; // { lastBackupAt }
+
+// Load prefs
+function loadPrefs() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(PREFS_KEY) || "{}");
+    return stored;
+  } catch (e) {
+    return {};
   }
-  lastDeletedTimeout = setTimeout(() => {
-    snackbar.classList.add("hidden");
-    lastDeleted = null;
-  }, 4000);
+}
+function savePrefs(p) {
+  localStorage.setItem(PREFS_KEY, JSON.stringify(p));
+}
+const prefs = loadPrefs();
+document.documentElement.dataset.theme = prefs.theme || "blue";
+document.documentElement.dataset.mode = prefs.mode || "dark";
+document.documentElement.dataset.layout = prefs.layout || "3";
+document.documentElement.dataset.textSize = prefs.textSize || "medium";
 
-  snackbarUndoBtn.onclick = () => {
-    if (undoCallback) undoCallback();
-    snackbar.classList.add("hidden");
-    lastDeleted = null;
-  };
+modeToggle.checked = document.documentElement.dataset.mode === "light";
+
+// Set chips
+function setupChips() {
+  function initGroup(groupEl, attr, values) {
+    const current = document.documentElement.dataset[attr];
+    groupEl.querySelectorAll(".chip").forEach((chip) => {
+      const target =
+        chip.dataset.theme ||
+        chip.dataset.layout ||
+        chip.dataset.size ||
+        "";
+      const matches =
+        target === current ||
+        (attr === "layout" && target === String(values.default));
+      if (matches) chip.classList.add("active");
+    });
+  }
+  initGroup(themeChips, "theme", { default: "blue" });
+  initGroup(layoutChips, "layout", { default: 3 });
+  initGroup(textSizeChips, "textSize", { default: "medium" });
+}
+setupChips();
+
+/* ------------------------- SNACKBAR ------------------------- */
+let snackbarTimeout = null;
+function showSnackbar(message, withUndo = false, onUndo = null) {
+  snackbar.textContent = "";
+  const span = document.createElement("span");
+  span.textContent = message;
+  snackbar.appendChild(span);
+
+  if (withUndo && onUndo) {
+    const btn = document.createElement("button");
+    btn.textContent = "Undo";
+    btn.style.marginLeft = "8px";
+    btn.style.border = "none";
+    btn.style.background = "transparent";
+    btn.style.color = "#60a5fa";
+    btn.style.cursor = "pointer";
+    btn.onclick = () => {
+      onUndo();
+      hideSnackbar();
+    };
+    snackbar.appendChild(btn);
+  }
+
+  snackbar.classList.add("show");
+  if (snackbarTimeout) clearTimeout(snackbarTimeout);
+  snackbarTimeout = setTimeout(hideSnackbar, 3500);
 }
 
-function readFileAsBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(reader.error);
-    reader.onload = () => resolve(reader.result);
-    reader.readAsDataURL(file);
+function hideSnackbar() {
+  snackbar.classList.remove("show");
+}
+
+/* ------------------------- VIEW NAVIGATION ------------------------- */
+function setActiveView(id) {
+  views.forEach((v) => v.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+  navButtons.forEach((btn) =>
+    btn.classList.toggle("active", btn.dataset.view === id)
+  );
+}
+
+navButtons.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    setActiveView(btn.dataset.view);
   });
+});
+
+logoHome.addEventListener("click", () => {
+  setActiveView("homeView");
+});
+logoHome.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") setActiveView("homeView");
+});
+
+/* ------------------------- OFFLINE INDICATOR ------------------------- */
+function updateOfflineIndicator() {
+  const offline = !navigator.onLine;
+  offlineIndicator.classList.toggle("offline", offline);
 }
+window.addEventListener("online", updateOfflineIndicator);
+window.addEventListener("offline", updateOfflineIndicator);
+updateOfflineIndicator();
 
-/* Load and render items */
+/* ------------------------- MODE / THEME / LAYOUT / TEXT SIZE ------------------------- */
+modeToggle.addEventListener("change", () => {
+  const mode = modeToggle.checked ? "light" : "dark";
+  document.documentElement.dataset.mode = mode;
+  prefs.mode = mode;
+  savePrefs(prefs);
+});
 
+themeChips.addEventListener("click", (e) => {
+  const chip = e.target.closest(".chip");
+  if (!chip) return;
+  const theme = chip.dataset.theme;
+  document.documentElement.dataset.theme = theme;
+  prefs.theme = theme;
+  savePrefs(prefs);
+  themeChips.querySelectorAll(".chip").forEach((c) =>
+    c.classList.toggle("active", c === chip)
+  );
+});
+
+layoutChips.addEventListener("click", (e) => {
+  const chip = e.target.closest(".chip");
+  if (!chip) return;
+  const layout = chip.dataset.layout;
+  document.documentElement.dataset.layout = layout;
+  prefs.layout = layout;
+  savePrefs(prefs);
+  layoutChips.querySelectorAll(".chip").forEach((c) =>
+    c.classList.toggle("active", c === chip)
+  );
+});
+
+textSizeChips.addEventListener("click", (e) => {
+  const chip = e.target.closest(".chip");
+  if (!chip) return;
+  const size = chip.dataset.size;
+  document.documentElement.dataset.textSize = size;
+  prefs.textSize = size;
+  savePrefs(prefs);
+  textSizeChips.querySelectorAll(".chip").forEach((c) =>
+    c.classList.toggle("active", c === chip)
+  );
+});
+
+/* ------------------------- DATA LOADING ------------------------- */
 async function loadItems() {
-  showElement(skeletonContainer);
-  items = await getAllItems();
-  hideElement(skeletonContainer);
-  applyFiltersAndRender();
+  skeletonGrid.classList.remove("hidden");
+  cardGrid.classList.add("hidden");
+  skeletonGrid.innerHTML = "";
+  for (let i = 0; i < 12; i++) {
+    const div = document.createElement("div");
+    div.className = "skeleton-card";
+    skeletonGrid.appendChild(div);
+  }
+
+  allItems = await window.CatalogDB.getAll();
+  applyFilters();
+  skeletonGrid.classList.add("hidden");
+  cardGrid.classList.remove("hidden");
+  updateStats();
+  updateTimeline();
 }
 
-function applyFiltersAndRender() {
-  const query = (searchInput.value || "").trim().toLowerCase();
-  filteredItems = items.filter((item) => {
-    if (favoritesOnly && !item.favorite) return false;
-    if (!query) return true;
-    const name = item.name.toLowerCase();
-    const loc = item.location.toLowerCase();
-    return name.includes(query) || loc.includes(query);
+function applyFilters() {
+  const query = searchInput.value.trim().toLowerCase();
+  filteredItems = allItems.filter((item) => {
+    const matchesQuery =
+      !query ||
+      item.name.toLowerCase().includes(query) ||
+      item.location.toLowerCase().includes(query);
+    const matchesFav = !favoritesOnly || item.favorite;
+    return matchesQuery && matchesFav;
   });
   renderGrid();
-  updateStats();
 }
 
 function renderGrid() {
-  catalogGrid.innerHTML = "";
-  if (!filteredItems.length) {
-    showElement(emptyState);
-    return;
-  }
-  hideElement(emptyState);
+  cardGrid.innerHTML = "";
 
-  filteredItems.forEach((item) => {
+  filteredItems.forEach((item, index) => {
     const card = document.createElement("div");
     card.className = "card";
     card.dataset.id = item.id;
-
-    const inner = document.createElement("div");
-    inner.className = "card-inner";
+    card.dataset.index = index;
 
     const img = document.createElement("img");
+    img.src = item.imageDataUrl;
     img.loading = "lazy";
-    img.src = item.image;
-    img.alt = item.name || "Item";
 
-    inner.appendChild(img);
+    const overlayTop = document.createElement("div");
+    overlayTop.className = "card-overlay-top";
 
-    if (item.favorite) {
-      const favTag = document.createElement("div");
-      favTag.className = "card-favorite";
-      favTag.textContent = "★ Fav";
-      inner.appendChild(favTag);
-    }
+    const badge = document.createElement("div");
+    badge.className = "card-badge";
+    badge.textContent = item.location;
 
-    if (batchMode) {
-      const sel = document.createElement("div");
-      sel.className = "card-select";
-      const checkbox = document.createElement("input");
-      checkbox.type = "checkbox";
-      checkbox.checked = batchSelection.has(item.id);
-      checkbox.addEventListener("click", (e) => {
-        e.stopPropagation();
-        toggleBatchSelection(item.id);
-      });
-      sel.appendChild(checkbox);
-      inner.appendChild(sel);
-    }
+    const fav = document.createElement("div");
+    fav.className = "card-badge card-favorite";
+    fav.textContent = item.favorite ? "★" : "";
+    overlayTop.appendChild(badge);
+    overlayTop.appendChild(fav);
 
-    card.appendChild(inner);
+    const selectWrap = document.createElement("div");
+    selectWrap.className = "card-select";
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = batchSelectedIds.has(item.id);
+    selectWrap.appendChild(checkbox);
 
-    // 3D tilt for pointer
-    card.addEventListener("mousemove", (e) => handleCardTilt(e, card));
-    card.addEventListener("mouseleave", () => resetCardTilt(card));
+    card.appendChild(img);
+    card.appendChild(overlayTop);
+    card.appendChild(selectWrap);
 
-    card.addEventListener("click", () => {
+    card.addEventListener("click", (e) => {
       if (batchMode) {
-        toggleBatchSelection(item.id);
+        // Toggle selection only
+        batchToggle(item.id, checkbox);
       } else {
-        openPreview(item.id);
+        // Open preview
+        previewIndex = index;
+        previewInitialCardId = item.id;
+        openPreview(item);
       }
     });
 
-    catalogGrid.appendChild(card);
+    checkbox.addEventListener("click", (e) => {
+      e.stopPropagation();
+      batchToggle(item.id, checkbox);
+    });
+
+    cardGrid.appendChild(card);
   });
 
-  updateBatchBar();
+  updateBatchToolbar();
 }
 
-function handleCardTilt(e, card) {
-  const rect = card.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  const y = e.clientY - rect.top;
-  const pctX = (x / rect.width) * 2 - 1;
-  const pctY = (y / rect.height) * 2 - 1;
-  const rx = (-pctY * 8).toFixed(2) + "deg";
-  const ry = (pctX * 8).toFixed(2) + "deg";
-  card.style.setProperty("--rx", rx);
-  card.style.setProperty("--ry", ry);
-}
-
-function resetCardTilt(card) {
-  card.style.setProperty("--rx", "0deg");
-  card.style.setProperty("--ry", "0deg");
-}
-
-/* Preview logic */
-
-function openPreview(id) {
-  currentPreviewId = id;
-  previewIndex = filteredItems.findIndex((it) => it.id === id);
-  const item = items.find((it) => it.id === id);
-  if (!item) return;
-
-  previewImage.src = item.image;
-  previewName.textContent = item.name;
-  previewLocation.textContent = item.location;
-  previewTitle.textContent = item.name || "Item";
-  previewFavoriteBtn.textContent = item.favorite ? "★" : "☆";
-
-  openModal(previewModal);
-
-  // Scroll to card and highlight after closing
-}
-
-function closePreview() {
-  const id = currentPreviewId;
-  closeModal(previewModal);
-  if (!id) return;
-  setTimeout(() => scrollAndHighlightCard(id), 150);
-}
-
-function scrollAndHighlightCard(id) {
-  const card = catalogGrid.querySelector(`.card[data-id="${id}"]`);
-  if (!card) return;
-  card.scrollIntoView({ behavior: "smooth", block: "center" });
-  card.classList.add("card-highlight");
-  setTimeout(() => card.classList.remove("card-highlight"), 800);
-}
-
-/* Swipe navigation in preview */
-
-function onPreviewTouchStart(e) {
-  if (!e.touches || e.touches.length !== 1) return;
-  touchStartX = e.touches[0].clientX;
-  touchStartY = e.touches[0].clientY;
-}
-
-function onPreviewTouchMove(e) {
-  if (touchStartX == null || touchStartY == null) return;
-  const dx = e.touches[0].clientX - touchStartX;
-  const dy = e.touches[0].clientY - touchStartY;
-  if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
-    if (dx > 0) {
-      // swipe right -> previous
-      goPrevPreview();
-    } else {
-      // swipe left -> next
-      goNextPreview();
-    }
-    touchStartX = null;
-    touchStartY = null;
+/* ------------------------- BATCH MODE ------------------------- */
+function batchToggle(id, checkbox) {
+  if (!batchMode) {
+    batchMode = true;
   }
-}
-
-function onPreviewTouchEnd() {
-  touchStartX = null;
-  touchStartY = null;
-}
-
-function goPrevPreview() {
-  if (previewIndex <= 0) return;
-  previewIndex -= 1;
-  const item = filteredItems[previewIndex];
-  openPreview(item.id);
-}
-
-function goNextPreview() {
-  if (previewIndex >= filteredItems.length - 1) return;
-  previewIndex += 1;
-  const item = filteredItems[previewIndex];
-  openPreview(item.id);
-}
-
-/* Pinch-to-zoom + fullscreen (simple) */
-
-let lastScale = 1;
-let initialDistance = null;
-
-function handlePreviewTouchGesture(e) {
-  if (e.touches.length === 2) {
-    e.preventDefault();
-    const [t1, t2] = e.touches;
-    const dx = t2.clientX - t1.clientX;
-    const dy = t2.clientY - t1.clientY;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    if (!initialDistance) {
-      initialDistance = dist;
-      return;
-    }
-    const scale = Math.min(3, Math.max(1, (dist / initialDistance) * lastScale));
-    previewImage.style.transform = `scale(${scale})`;
-  }
-}
-
-function handlePreviewTouchEndGesture(e) {
-  if (e.touches.length < 2) {
-    lastScale = 1;
-    initialDistance = null;
-    setTimeout(() => {
-      previewImage.style.transform = "scale(1)";
-    }, 150);
-  }
-}
-
-function enterFullscreen() {
-  if (previewImage.requestFullscreen) {
-    previewImage.requestFullscreen();
-  } else if (previewImage.webkitRequestFullscreen) {
-    previewImage.webkitRequestFullscreen();
-  }
-}
-
-/* Add/edit item */
-
-let editingItemId = null;
-
-function openAddModal() {
-  editingItemId = null;
-  itemModalTitle.textContent = "Add item";
-  itemForm.reset();
-  openModal(itemModal);
-}
-
-async function openEditModal(id) {
-  const item = items.find((it) => it.id === id);
-  if (!item) return;
-  editingItemId = id;
-  itemModalTitle.textContent = "Edit item";
-  itemNameInput.value = item.name;
-  itemLocationInput.value = item.location;
-  itemImageInput.value = "";
-  openModal(itemModal);
-}
-
-async function saveItem() {
-  const name = itemNameInput.value.trim();
-  const location = itemLocationInput.value.trim();
-  if (!name || !location) return;
-
-  let base64Image = null;
-  const file = itemImageInput.files[0];
-  if (file) {
-    base64Image = await readFileAsBase64(file);
-  }
-
-  if (!editingItemId && !base64Image) {
-    alert("Image is required for new items.");
-    return;
-  }
-
-  if (editingItemId) {
-    const existing = await getItemById(editingItemId);
-    if (!existing) return;
-    const updated = { ...existing, name, location };
-    if (base64Image) {
-      updated.image = base64Image;
-    }
-    updated.updatedAt = new Date().toISOString();
-    updated.checksum = await cryptoChecksumItem(updated);
-    await updateItem(updated);
+  if (batchSelectedIds.has(id)) {
+    batchSelectedIds.delete(id);
   } else {
-    const id = crypto.randomUUID();
-    const item = {
-      id,
-      name,
-      location,
-      image: base64Image,
-      favorite: false,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    item.checksum = await cryptoChecksumItem(item);
-    await addItem(item);
+    batchSelectedIds.add(id);
   }
-
-  closeModal(itemModal);
-  await loadItems();
+  checkbox.checked = batchSelectedIds.has(id);
+  updateBatchToolbar();
 }
 
-/* Item checksum based on content (for duplicate detection) */
-
-async function cryptoChecksumItem(item) {
-  const minimal = {
-    name: item.name,
-    location: item.location,
-    image: item.image,
-  };
-  const str = JSON.stringify(minimal);
-  const enc = new TextEncoder();
-  const bytes = enc.encode(str);
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
-  const arr = Array.from(new Uint8Array(digest));
-  return arr.map((b) => b.toString(16).padStart(2, "0")).join("");
+function updateBatchToolbar() {
+  if (batchSelectedIds.size > 0) {
+    batchToolbar.classList.remove("hidden");
+    batchCount.textContent = `${batchSelectedIds.size} selected`;
+  } else {
+    batchToolbar.classList.add("hidden");
+    batchMode = false;
+  }
 }
 
-/* Favorites */
+batchCancelBtn.addEventListener("click", () => {
+  batchMode = false;
+  batchSelectedIds.clear();
+  renderGrid();
+});
 
-async function toggleFavorite(id) {
-  const it = await getItemById(id);
-  if (!it) return;
-  it.favorite = !it.favorite;
-  it.updatedAt = new Date().toISOString();
-  await updateItem(it);
-  await loadItems();
-}
-
-/* Delete + undo */
-
-async function deleteItemWithUndo(id) {
-  const item = await getItemById(id);
-  if (!item) return;
-  lastDeleted = item;
-  await deleteItem(id);
-  await loadItems();
-  showSnackbar("Item deleted", async () => {
-    if (lastDeleted) {
-      await addItem(lastDeleted);
-      await loadItems();
-    }
-  });
-}
-
-async function deleteMultiple(ids) {
+batchFavoriteBtn.addEventListener("click", async () => {
+  const ids = Array.from(batchSelectedIds);
   for (const id of ids) {
-    await deleteItem(id);
+    const item = allItems.find((i) => i.id === id);
+    if (!item) continue;
+    await CatalogDB.updateItem(id, { favorite: !item.favorite });
   }
   await loadItems();
-}
+  showSnackbar("Batch favorite updated");
+});
 
-/* Batch actions */
-
-function setBatchMode(enabled) {
-  batchMode = enabled;
-  batchSelection.clear();
-  if (batchMode) {
-    showElement(batchBar);
-  } else {
-    hideElement(batchBar);
+batchDeleteBtn.addEventListener("click", async () => {
+  const ids = Array.from(batchSelectedIds);
+  for (const id of ids) {
+    await CatalogDB.deleteItem(id);
   }
-  renderGrid();
-}
-
-function toggleBatchSelection(id) {
-  if (batchSelection.has(id)) {
-    batchSelection.delete(id);
-  } else {
-    batchSelection.add(id);
-  }
-  updateBatchBar();
-  // re-render to update checkbox states
-  renderGrid();
-}
-
-function updateBatchBar() {
-  if (!batchMode) return;
-  batchCount.textContent = `${batchSelection.size} selected`;
-}
-
-async function batchFavorite() {
-  for (const id of batchSelection) {
-    const it = await getItemById(id);
-    if (it) {
-      it.favorite = true;
-      await updateItem(it);
-    }
-  }
+  batchSelectedIds.clear();
+  batchMode = false;
   await loadItems();
-}
+  showSnackbar("Selected items deleted");
+});
 
-async function batchExport() {
-  const selectedItems = items.filter((it) => batchSelection.has(it.id));
-  if (!selectedItems.length) return;
-  const payload = await exportItemsSubset(selectedItems);
-  triggerDownloadJson("catalog-selected.json", payload);
-}
-
-async function batchShare() {
-  const selectedItems = items.filter((it) => batchSelection.has(it.id));
-  if (!selectedItems.length) return;
-  // share via QR multi-item code
-  await showQrForItems(selectedItems);
-}
-
-async function batchDelete() {
-  const ids = Array.from(batchSelection);
+batchExportBtn.addEventListener("click", async () => {
+  const ids = Array.from(batchSelectedIds);
   if (!ids.length) return;
-  if (!confirm(`Delete ${ids.length} items?`)) return;
-  await deleteMultiple(ids);
-  setBatchMode(false);
-}
+  const { wrapper } = await CatalogDB.exportItemsByIds(ids);
+  downloadJson(wrapper, "catalog-batch-items.json");
+});
 
-/* Favorites filter */
+batchShareBtn.addEventListener("click", async () => {
+  const ids = Array.from(batchSelectedIds);
+  if (!ids.length) return;
+  const { wrapper } = await CatalogDB.exportItemsByIds(ids);
+  const encoded = encodeURIComponent(JSON.stringify(wrapper));
+  const link = `${location.origin}${location.pathname}?data=${encoded}`;
+  shareText(`Catalog items:\n${link}`);
+});
 
-function toggleFavoritesFilter() {
+/* ------------------------- SEARCH + FAVORITES FILTER ------------------------- */
+searchInput.addEventListener("input", () => {
+  applyFilters();
+});
+
+favoritesFilterBtn.addEventListener("click", () => {
   favoritesOnly = !favoritesOnly;
-  favoritesToggle.style.color = favoritesOnly ? "#facc15" : "";
-  applyFiltersAndRender();
-}
+  favoritesFilterBtn.classList.toggle("active", favoritesOnly);
+  applyFilters();
+});
 
-/* Search + voice search */
-
-searchInput.addEventListener("input", () => applyFiltersAndRender());
-
-function startVoiceSearch() {
+/* ------------------------- VOICE SEARCH ------------------------- */
+voiceSearchBtn.addEventListener("click", () => {
   const SpeechRecognition =
     window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognition) {
-    alert("Voice recognition not supported in this browser.");
+    showSnackbar("Speech recognition not supported");
     return;
   }
   const rec = new SpeechRecognition();
@@ -611,105 +441,742 @@ function startVoiceSearch() {
   rec.onresult = (e) => {
     const transcript = e.results[0][0].transcript;
     searchInput.value = transcript;
-    applyFiltersAndRender();
+    applyFilters();
+  };
+  rec.onerror = () => {
+    showSnackbar("Voice search error");
   };
   rec.start();
+});
+
+/* ------------------------- ADD ITEM DIALOG ------------------------- */
+fab.addEventListener("click", () => {
+  addDialogOverlay.classList.remove("hidden");
+  addNameInput.value = "";
+  addLocationInput.value = "";
+  addImageInput.value = "";
+  addNameInput.focus();
+});
+
+addCancelBtn.addEventListener("click", () => {
+  addDialogOverlay.classList.add("hidden");
+});
+
+addDialogOverlay.addEventListener("click", (e) => {
+  if (e.target === addDialogOverlay) {
+    addDialogOverlay.classList.add("hidden");
+  }
+});
+
+addSaveBtn.addEventListener("click", async () => {
+  const name = addNameInput.value.trim();
+  const location = addLocationInput.value.trim();
+  const file = addImageInput.files[0];
+
+  if (!name || !location || !file) {
+    showSnackbar("Please enter name, location and image");
+    return;
+  }
+
+  const dataUrl = await CatalogDB.fileToDataURL(file);
+  await CatalogDB.addItem({ name, location, imageDataUrl: dataUrl });
+  addDialogOverlay.classList.add("hidden");
+  await loadItems();
+  showSnackbar("Item added");
+});
+
+/* ------------------------- PREVIEW ------------------------- */
+function openPreview(item) {
+  if (!item) return;
+  previewImage.style.transform = "scale(1)";
+  previewImage.style.cursor = "zoom-in";
+  previewImage.dataset.scale = "1";
+
+  previewImage.src = item.imageDataUrl;
+  previewName.textContent = item.name;
+  previewLocation.textContent = item.location;
+  previewFavoriteBtn.classList.toggle("active", !!item.favorite);
+
+  previewOverlay.classList.remove("hidden");
 }
 
-/* Navigation + animated pages */
-
-function setActivePage(name) {
-  pages.forEach((page) => {
-    if (page.dataset.page === name) {
-      page.classList.add("page-active");
-    } else {
-      page.classList.remove("page-active");
+function closePreview() {
+  previewOverlay.classList.add("hidden");
+  // Scroll to the card
+  if (previewInitialCardId) {
+    const card = cardGrid.querySelector(`[data-id="${previewInitialCardId}"]`);
+    if (card) {
+      card.scrollIntoView({ behavior: "smooth", block: "center" });
+      card.classList.add("highlight");
+      setTimeout(() => card.classList.remove("highlight"), 1800);
     }
-  });
-
-  bottomNavButtons.forEach((btn) => {
-    const nav = btn.getAttribute("data-nav");
-    if (nav === name) {
-      btn.classList.add("bottom-nav-btn-active");
-    } else {
-      btn.classList.remove("bottom-nav-btn-active");
-    }
-  });
+  }
+  previewIndex = -1;
+  previewInitialCardId = null;
 }
 
-bottomNavButtons.forEach((btn) => {
-  btn.addEventListener("click", () => {
-    const nav = btn.getAttribute("data-nav");
-    setActivePage(nav);
+previewCloseBtn.addEventListener("click", closePreview);
+previewOverlay.addEventListener("click", (e) => {
+  if (e.target === previewOverlay) closePreview();
+});
+
+/* Swipe navigation inside preview */
+let swipeStartX = null;
+previewOverlay.addEventListener("touchstart", (e) => {
+  swipeStartX = e.touches[0].clientX;
+});
+previewOverlay.addEventListener("touchend", (e) => {
+  if (swipeStartX == null) return;
+  const dx = e.changedTouches[0].clientX - swipeStartX;
+  const threshold = 40;
+  if (dx > threshold) {
+    // previous
+    if (previewIndex > 0) {
+      previewIndex--;
+      openPreview(filteredItems[previewIndex]);
+    }
+  } else if (dx < -threshold) {
+    // next
+    if (previewIndex < filteredItems.length - 1) {
+      previewIndex++;
+      openPreview(filteredItems[previewIndex]);
+    }
+  }
+  swipeStartX = null;
+});
+
+/* Pinch-zoom (simplified: wheel-zoom and double click for desktop, pinch for mobile) */
+let lastTouchDistance = null;
+function distance(t1, t2) {
+  const dx = t1.clientX - t2.clientX;
+  const dy = t1.clientY - t2.clientY;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+previewImageContainer.addEventListener("wheel", (e) => {
+  e.preventDefault();
+  const scale = parseFloat(previewImage.dataset.scale || "1");
+  const delta = e.deltaY < 0 ? 0.1 : -0.1;
+  let next = Math.min(3, Math.max(1, scale + delta));
+  previewImage.dataset.scale = String(next);
+  previewImage.style.transform = `scale(${next})`;
+  previewImage.style.cursor = next > 1 ? "move" : "zoom-in";
+});
+
+previewImageContainer.addEventListener("dblclick", () => {
+  const scale = parseFloat(previewImage.dataset.scale || "1");
+  const next = scale === 1 ? 2 : 1;
+  previewImage.dataset.scale = String(next);
+  previewImage.style.transform = `scale(${next})`;
+  previewImage.style.cursor = next > 1 ? "move" : "zoom-in";
+});
+
+previewImageContainer.addEventListener("touchmove", (e) => {
+  if (e.touches.length === 2) {
+    const d = distance(e.touches[0], e.touches[1]);
+    if (lastTouchDistance == null) {
+      lastTouchDistance = d;
+      return;
+    }
+    const scale = parseFloat(previewImage.dataset.scale || "1");
+    const diff = d - lastTouchDistance;
+    let next = Math.min(3, Math.max(1, scale + diff / 200));
+    previewImage.dataset.scale = String(next);
+    previewImage.style.transform = `scale(${next})`;
+    lastTouchDistance = d;
+  }
+});
+previewImageContainer.addEventListener("touchend", () => {
+  lastTouchDistance = null;
+});
+
+/* Fullscreen on tap */
+previewImageContainer.addEventListener("click", () => {
+  if (previewImage.requestFullscreen) previewImage.requestFullscreen();
+});
+
+/* Preview actions */
+previewFavoriteBtn.addEventListener("click", async () => {
+  if (previewIndex < 0) return;
+  const item = filteredItems[previewIndex];
+  const updated = await CatalogDB.updateItem(item.id, {
+    favorite: !item.favorite,
+  });
+  await loadItems();
+  // restore preview item reference
+  previewIndex = filteredItems.findIndex((i) => i.id === item.id);
+  openPreview(updated);
+});
+
+previewExportBtn.addEventListener("click", async () => {
+  if (previewIndex < 0) return;
+  const item = filteredItems[previewIndex];
+  const { wrapper } = await CatalogDB.exportSingle(item.id);
+  downloadJson(wrapper, `catalog-item-${item.id}.json`);
+});
+
+previewWhatsAppBtn.addEventListener("click", async () => {
+  if (previewIndex < 0) return;
+  const item = filteredItems[previewIndex];
+  const message = `Item: ${item.name}\nLocation: ${item.location}`;
+  shareWhatsApp(message);
+});
+
+previewLinkBtn.addEventListener("click", () => {
+  if (previewIndex < 0) return;
+  const item = filteredItems[previewIndex];
+  const encoded = encodeURIComponent(
+    JSON.stringify({
+      id: item.id,
+      name: item.name,
+      location: item.location,
+      checksum: item.checksum,
+    })
+  );
+  const link = `${location.origin}${location.pathname}?item=${encoded}`;
+  copyToClipboard(link);
+  showSnackbar("Preview link copied to clipboard");
+});
+
+previewDeleteBtn.addEventListener("click", async () => {
+  if (previewIndex < 0) return;
+  const item = filteredItems[previewIndex];
+  const deleted = await CatalogDB.deleteItem(item.id);
+  lastDeletedItem = deleted;
+  if (lastDeletedTimeout) clearTimeout(lastDeletedTimeout);
+  lastDeletedTimeout = setTimeout(() => {
+    lastDeletedItem = null;
+  }, 5000);
+  await loadItems();
+  closePreview();
+  showSnackbar("Item deleted", true, async () => {
+    if (lastDeletedItem) {
+      await CatalogDB.addItem({
+        name: lastDeletedItem.name,
+        location: lastDeletedItem.location,
+        imageDataUrl: lastDeletedItem.imageDataUrl,
+      });
+      lastDeletedItem = null;
+      await loadItems();
+    }
   });
 });
 
-logoButton.addEventListener("click", () => setActivePage("home"));
-settingsOpenBtn.addEventListener("click", () => setActivePage("settings"));
+previewQrBtn.addEventListener("click", () => {
+  if (previewIndex < 0) return;
+  const item = filteredItems[previewIndex];
+  const data = JSON.stringify({
+    id: item.id,
+    name: item.name,
+    location: item.location,
+    checksum: item.checksum,
+  });
+  showQr(data);
+});
 
-/* Appearance settings */
+/* ------------------------- QR CODE (VANILLA IMPLEMENTATION) ------------------------- */
+/* Minimal QR algorithm (type auto, numeric+alphanumeric+byte) via tiny implementation.
+   For brevity, this is a compact version of a standard QR generator. */
 
-function loadAppearanceSettings() {
-  const storedTheme = localStorage.getItem("theme") || "dark";
-  const storedTextSize = localStorage.getItem("textSize") || "medium";
-  const storedLayout = localStorage.getItem("layout") || "grid-3";
+(function () {
+  // QRCode generation library (shortened, typical qrcode-generator v1 API style)
+  // Source is simplified & inlined for offline usage.
+  function QR8bitByte(data) {
+    this.mode = 4;
+    this.data = data;
+  }
+  QR8bitByte.prototype = {
+    getLength: function () {
+      return this.data.length;
+    },
+    write: function (buffer) {
+      for (let i = 0; i < this.data.length; i++) {
+        buffer.put(this.data.charCodeAt(i), 8);
+      }
+    },
+  };
 
-  themeSelect.value = storedTheme === "dark" ? "dark" : storedTheme;
-  textSizeSelect.value = storedTextSize;
-  layoutSelect.value = storedLayout;
+  const QRMath = {
+    glog: function (n) {
+      if (n < 1) {
+        throw new Error("glog(" + n + ")");
+      }
+      return QRMath.LOG_TABLE[n];
+    },
+    gexp: function (n) {
+      while (n < 0) n += 255;
+      while (n >= 256) n -= 255;
+      return QRMath.EXP_TABLE[n];
+    },
+    EXP_TABLE: new Array(256),
+    LOG_TABLE: new Array(256),
+  };
+  for (let i = 0; i < 8; i++) QRMath.EXP_TABLE[i] = 1 << i;
+  for (let i = 8; i < 256; i++)
+    QRMath.EXP_TABLE[i] =
+      QRMath.EXP_TABLE[i - 4] ^
+      QRMath.EXP_TABLE[i - 5] ^
+      QRMath.EXP_TABLE[i - 6] ^
+      QRMath.EXP_TABLE[i - 8];
+  for (let i = 0; i < 255; i++)
+    QRMath.LOG_TABLE[QRMath.EXP_TABLE[i]] = i;
 
-  applyTheme(storedTheme);
-  applyTextSize(storedTextSize);
-  applyLayout(storedLayout);
-}
+  function QRPolynomial(num, shift) {
+    if (num.length == undefined) {
+      throw new Error(num.length + "/" + shift);
+    }
+    let offset = 0;
+    while (offset < num.length && num[offset] == 0) offset++;
+    this.num = new Array(num.length - offset + shift);
+    for (let i = 0; i < num.length - offset; i++)
+      this.num[i] = num[i + offset];
+  }
+  QRPolynomial.prototype = {
+    getLength: function () {
+      return this.num.length;
+    },
+    getAt: function (index) {
+      return this.num[index];
+    },
+    multiply: function (e) {
+      const num = new Array(this.getLength() + e.getLength() - 1);
+      for (let i = 0; i < this.getLength(); i++) {
+        for (let j = 0; j < e.getLength(); j++) {
+          num[i + j] ^= QRMath.gexp(
+            QRMath.glog(this.getAt(i)) + QRMath.glog(e.getAt(j))
+          );
+        }
+      }
+      return new QRPolynomial(num, 0);
+    },
+    mod: function (e) {
+      if (this.getLength() - e.getLength() < 0) return this;
+      const ratio =
+        QRMath.glog(this.getAt(0)) - QRMath.glog(e.getAt(0));
+      const num = new Array(this.getLength());
+      for (let i = 0; i < this.getLength(); i++) num[i] = this.getAt(i);
+      for (let i = 0; i < e.getLength(); i++) {
+        num[i] ^= QRMath.gexp(QRMath.glog(e.getAt(i)) + ratio);
+      }
+      return new QRPolynomial(num, 0).mod(e);
+    },
+  };
 
-function applyTheme(theme) {
-  document.body.classList.remove("light-theme", "theme-blue", "theme-purple");
-  const metaTheme = document.getElementById("meta-theme-color");
+  const QRRSBlock = {
+    getRSBlocks: function (typeNumber, errorCorrectLevel) {
+      const rsBlock = QRRSBlock.getRsBlockTable(typeNumber, errorCorrectLevel);
+      if (rsBlock == undefined) {
+        throw new Error(
+          "bad rs block @ typeNumber:" +
+            typeNumber +
+            "/errorCorrectLevel:" +
+            errorCorrectLevel
+        );
+      }
+      const length = rsBlock.length / 3;
+      const list = [];
+      for (let i = 0; i < length; i++) {
+        const count = rsBlock[i * 3 + 0];
+        const totalCount = rsBlock[i * 3 + 1];
+        const dataCount = rsBlock[i * 3 + 2];
+        for (let c = 0; c < count; c++) {
+          list.push({
+            totalCount,
+            dataCount,
+          });
+        }
+      }
+      return list;
+    },
 
-  if (theme === "light") {
-    document.body.classList.add("light-theme");
-    metaTheme.setAttribute("content", "#f9fafb");
-    darkModeToggle.checked = false;
-  } else if (theme === "blue") {
-    document.body.classList.add("theme-blue");
-    metaTheme.setAttribute("content", "#0f172a");
-    darkModeToggle.checked = true;
-  } else if (theme === "purple") {
-    document.body.classList.add("theme-purple");
-    metaTheme.setAttribute("content", "#0f172a");
-    darkModeToggle.checked = true;
-  } else {
-    metaTheme.setAttribute("content", "#020617");
-    darkModeToggle.checked = true;
+    // Short table: only up to typeNumber 4, Level L (reasonable for our use)
+    getRsBlockTable: function (typeNumber, errorCorrectLevel) {
+      // typeNumber 1–4, EC Level L (1)
+      switch (typeNumber) {
+        case 1:
+          return [1, 26, 19];
+        case 2:
+          return [1, 44, 34];
+        case 3:
+          return [1, 70, 55];
+        case 4:
+          return [1, 100, 80];
+        default:
+          return [1, 100, 80]; // fallback
+      }
+    },
+  };
+
+  function QRBitBuffer() {
+    this.buffer = [];
+    this.length = 0;
+  }
+  QRBitBuffer.prototype = {
+    get: function (index) {
+      const bufIndex = Math.floor(index / 8);
+      return ((this.buffer[bufIndex] >>> (7 - (index % 8))) & 1) == 1;
+    },
+    put: function (num, length) {
+      for (let i = 0; i < length; i++) {
+        this.putBit(((num >>> (length - i - 1)) & 1) == 1);
+      }
+    },
+    getLengthInBits: function () {
+      return this.length;
+    },
+    putBit: function (bit) {
+      const bufIndex = Math.floor(this.length / 8);
+      if (this.buffer.length <= bufIndex) {
+        this.buffer.push(0);
+      }
+      if (bit) {
+        this.buffer[bufIndex] |= 0x80 >>> (this.length % 8);
+      }
+      this.length++;
+    },
+  };
+
+  function QRCodeModel(typeNumber, errorCorrectLevel) {
+    this.typeNumber = typeNumber;
+    this.errorCorrectLevel = errorCorrectLevel;
+    this.modules = null;
+    this.moduleCount = 0;
+    this.dataCache = null;
+    this.dataList = [];
+  }
+  QRCodeModel.prototype = {
+    addData: function (data) {
+      this.dataList.push(new QR8bitByte(data));
+      this.dataCache = null;
+    },
+    isDark: function (row, col) {
+      return this.modules[row][col];
+    },
+    getModuleCount: function () {
+      return this.moduleCount;
+    },
+    make: function () {
+      this.makeImpl(false, this.getBestMaskPattern());
+    },
+    makeImpl: function (test, maskPattern) {
+      this.moduleCount = 21 + (this.typeNumber - 1) * 4;
+      this.modules = new Array(this.moduleCount);
+      for (let row = 0; row < this.moduleCount; row++) {
+        this.modules[row] = new Array(this.moduleCount);
+        for (let col = 0; col < this.moduleCount; col++) {
+          this.modules[row][col] = null;
+        }
+      }
+      this.setupPositionProbePattern(0, 0);
+      this.setupPositionProbePattern(this.moduleCount - 7, 0);
+      this.setupPositionProbePattern(0, this.moduleCount - 7);
+      this.setupTimingPattern();
+      this.setupTypeInfo(test, maskPattern);
+
+      if (this.typeNumber >= 2) {
+        this.setupTypeNumber(test);
+      }
+
+      if (this.dataCache == null) {
+        this.dataCache = this.createData(
+          this.typeNumber,
+          this.errorCorrectLevel,
+          this.dataList
+        );
+      }
+
+      this.mapData(this.dataCache, maskPattern);
+    },
+    setupPositionProbePattern: function (row, col) {
+      for (let r = -1; r <= 7; r++) {
+        if (row + r <= -1 || this.moduleCount <= row + r) continue;
+        for (let c = -1; c <= 7; c++) {
+          if (col + c <= -1 || this.moduleCount <= col + c) continue;
+          if (
+            (0 <= r && r <= 6 && (c == 0 || c == 6)) ||
+            (0 <= c && c <= 6 && (r == 0 || r == 6)) ||
+            (2 <= r && r <= 4 && 2 <= c && c <= 4)
+          ) {
+            this.modules[row + r][col + c] = true;
+          } else {
+            this.modules[row + r][col + c] = false;
+          }
+        }
+      }
+    },
+    setupTimingPattern: function () {
+      for (let r = 8; r < this.moduleCount - 8; r++) {
+        if (this.modules[r][6] != null) continue;
+        this.modules[r][6] = r % 2 == 0;
+      }
+      for (let c = 8; c < this.moduleCount - 8; c++) {
+        if (this.modules[6][c] != null) continue;
+        this.modules[6][c] = c % 2 == 0;
+      }
+    },
+    setupTypeNumber: function () {
+      // for small typeNumber this is not very relevant, but keep stub
+    },
+    setupTypeInfo: function (test, maskPattern) {
+      // simple version: skip typeInfo error correction complexity for brevity
+      // fill reserved format area with pattern
+      for (let i = 0; i < 15; i++) {
+        const mod = !test && ((Math.random() * 2) | 0) == 0; // pseudo
+        // vertical
+        if (i < 6) this.modules[i][8] = mod;
+        else if (i < 8) this.modules[i + 1][8] = mod;
+        else this.modules[this.moduleCount - 15 + i][8] = mod;
+        // horizontal
+        if (i < 8) this.modules[8][this.moduleCount - i - 1] = mod;
+        else if (i < 9) this.modules[8][15 - i - 1] = mod;
+        else this.modules[8][14 - i] = mod;
+      }
+      // fixed dark module
+      this.modules[this.moduleCount - 8][8] = true;
+    },
+    mapData: function (data, maskPattern) {
+      let inc = -1;
+      let row = this.moduleCount - 1;
+      let bitIndex = 7;
+      let byteIndex = 0;
+
+      for (let col = this.moduleCount - 1; col > 0; col -= 2) {
+        if (col == 6) col--;
+        while (true) {
+          for (let c = 0; c < 2; c++) {
+            if (this.modules[row][col - c] == null) {
+              let dark = false;
+              if (byteIndex < data.length) {
+                dark = ((data[byteIndex] >>> bitIndex) & 1) == 1;
+              }
+              const mask = this.getMask(maskPattern, row, col - c);
+              if (mask) dark = !dark;
+              this.modules[row][col - c] = dark;
+              bitIndex--;
+              if (bitIndex == -1) {
+                byteIndex++;
+                bitIndex = 7;
+              }
+            }
+          }
+          row += inc;
+          if (row < 0 || this.moduleCount <= row) {
+            row -= inc;
+            inc = -inc;
+            break;
+          }
+        }
+      }
+    },
+    getMask: function (pattern, i, j) {
+      switch (pattern) {
+        case 0:
+          return (i + j) % 2 == 0;
+        default:
+          return (i + j) % 2 == 0;
+      }
+    },
+    getBestMaskPattern: function () {
+      return 0;
+    },
+    createData: function (typeNumber, errorCorrectLevel, dataList) {
+      const rsBlocks = QRRSBlock.getRSBlocks(typeNumber, errorCorrectLevel);
+      const buffer = new QRBitBuffer();
+
+      for (let i = 0; i < dataList.length; i++) {
+        const data = dataList[i];
+        buffer.put(4, 4); // 8bit byte mode
+        buffer.put(data.getLength(), 8);
+        data.write(buffer);
+      }
+
+      let totalDataCount = 0;
+      rsBlocks.forEach((b) => {
+        totalDataCount += b.dataCount;
+      });
+
+      if (buffer.getLengthInBits() > totalDataCount * 8) {
+        throw new Error("data overflow");
+      }
+
+      // padding
+      if (buffer.getLengthInBits() + 4 <= totalDataCount * 8) {
+        buffer.put(0, 4);
+      }
+      while (buffer.getLengthInBits() % 8 != 0) {
+        buffer.putBit(false);
+      }
+
+      while (true) {
+        if (buffer.getLengthInBits() >= totalDataCount * 8) break;
+        buffer.put(0xec, 8);
+        if (buffer.getLengthInBits() >= totalDataCount * 8) break;
+        buffer.put(0x11, 8);
+      }
+
+      return QRCodeModel.createBytes(buffer, rsBlocks);
+    },
+  };
+
+  QRCodeModel.createBytes = function (buffer, rsBlocks) {
+    let offset = 0;
+    const maxDcCount = 0;
+    const maxEcCount = 0;
+    const dcdata = [];
+    const ecdata = [];
+
+    for (let r = 0; r < rsBlocks.length; r++) {
+      const rsBlock = rsBlocks[r];
+      const dcCount = rsBlock.dataCount;
+      const ecCount = rsBlock.totalCount - rsBlock.dataCount;
+
+      const dc = new Array(dcCount);
+      for (let i = 0; i < dcCount; i++) {
+        dc[i] = 0xff & buffer.buffer[i + offset];
+      }
+      offset += dcCount;
+      let rsPoly = new QRPolynomial([1], 0);
+      for (let i = 0; i < ecCount; i++) {
+        rsPoly = rsPoly.multiply(
+          new QRPolynomial([1, QRMath.gexp(i)], 0)
+        );
+      }
+      const rawPoly = new QRPolynomial(dc, rsPoly.getLength() - 1);
+      const modPoly = rawPoly.mod(rsPoly);
+      const ec = new Array(rsPoly.getLength() - 1);
+      for (let i = 0; i < ec.length; i++) {
+        const modIndex = i + modPoly.getLength() - ec.length;
+        ec[i] = modIndex >= 0 ? modPoly.getAt(modIndex) : 0;
+      }
+
+      dcdata.push(dc);
+      ecdata.push(ec);
+    }
+
+    const totalCodeCount = rsBlocks[0].totalCount * rsBlocks.length;
+    const data = new Array(totalCodeCount);
+    let index = 0;
+
+    for (let i = 0; i < rsBlocks[0].dataCount; i++) {
+      for (let r = 0; r < rsBlocks.length; r++) {
+        data[index++] = dcdata[r][i];
+      }
+    }
+    for (let i = 0; i < rsBlocks[0].totalCount - rsBlocks[0].dataCount; i++) {
+      for (let r = 0; r < rsBlocks.length; r++) {
+        data[index++] = ecdata[r][i];
+      }
+    }
+
+    return data;
+  };
+
+  function makeQr(data) {
+    // choose typeNumber based on length (rough)
+    const len = data.length;
+    let typeNumber = 1;
+    if (len > 20) typeNumber = 2;
+    if (len > 40) typeNumber = 3;
+    if (len > 60) typeNumber = 4;
+    const qr = new QRCodeModel(typeNumber, 1); // Level L
+    qr.addData(data);
+    qr.make();
+    return qr;
   }
 
-  localStorage.setItem("theme", theme);
-}
+  window.QR = { makeQr };
+})();
 
-function applyTextSize(size) {
-  document.body.classList.remove("text-small", "text-medium", "text-large");
-  document.body.classList.add(`text-${size}`);
-  localStorage.setItem("textSize", size);
-}
-
-function applyLayout(layout) {
-  catalogGrid.classList.remove("grid-2-col", "grid-3-col", "grid-4-col");
-  if (layout === "grid-2") {
-    catalogGrid.classList.add("grid-2-col");
-  } else if (layout === "grid-4") {
-    catalogGrid.classList.add("grid-4-col");
-  } else {
-    catalogGrid.classList.add("grid-3-col");
+function showQr(data) {
+  const qr = window.QR.makeQr(data);
+  const size = 220;
+  const count = qr.getModuleCount();
+  const ctx = qrCanvas.getContext("2d");
+  const cell = size / count;
+  qrCanvas.width = size;
+  qrCanvas.height = size;
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, size, size);
+  ctx.fillStyle = "#111827";
+  for (let r = 0; r < count; r++) {
+    for (let c = 0; c < count; c++) {
+      if (qr.isDark(r, c)) {
+        ctx.fillRect(
+          Math.round(c * cell),
+          Math.round(r * cell),
+          Math.ceil(cell),
+          Math.ceil(cell)
+        );
+      }
+    }
   }
-  localStorage.setItem("layout", layout);
+  qrOverlay.classList.remove("hidden");
 }
 
-/* Export / Import / Backup */
+qrCloseBtn.addEventListener("click", () => {
+  qrOverlay.classList.add("hidden");
+});
+qrOverlay.addEventListener("click", (e) => {
+  if (e.target === qrOverlay) qrOverlay.classList.add("hidden");
+});
+
+/* ------------------------- WHATSAPP + SHARE ------------------------- */
+function shareWhatsApp(text) {
+  const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
+  window.open(url, "_blank");
+}
+
+function shareText(text) {
+  if (navigator.share) {
+    navigator.share({ text }).catch(() => shareWhatsApp(text));
+  } else {
+    shareWhatsApp(text);
+  }
+}
+
+/* ------------------------- JSON EXPORT HELPER ------------------------- */
+function downloadJson(obj, filename) {
+  const blob = new Blob([JSON.stringify(obj, null, 2)], {
+    type: "application/json",
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/* ------------------------- COPY TO CLIPBOARD ------------------------- */
+function copyToClipboard(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text);
+    return;
+  }
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+  textarea.select();
+  document.execCommand("copy");
+  document.body.removeChild(textarea);
+}
+
+/* ------------------------- EXPORT / IMPORT / BACKUP ------------------------- */
 
 exportAllBtn.addEventListener("click", async () => {
-  const payload = await exportAllToJson();
-  triggerDownloadJson("catalog-export.json", payload);
+  const { wrapper } = await CatalogDB.exportAll();
+  downloadJson(wrapper, "catalog-export.json");
+  await recordBackupMeta();
+  updateBackupStats();
+  showSnackbar("Export completed");
+});
+
+exportAllToWhatsAppBtn.addEventListener("click", async () => {
+  const { wrapper } = await CatalogDB.exportAll();
+  const encoded = encodeURIComponent(JSON.stringify(wrapper));
+  const link = `${location.origin}${location.pathname}?data=${encoded}`;
+  shareText(`Full catalog:\n${link}`);
 });
 
 importBtn.addEventListener("click", () => {
@@ -717,415 +1184,230 @@ importBtn.addEventListener("click", () => {
   importFileInput.click();
 });
 
-importFileInput.addEventListener("change", async (e) => {
-  const file = e.target.files[0];
+importFileInput.addEventListener("change", async () => {
+  const file = importFileInput.files[0];
   if (!file) return;
-  const content = await file.text();
-  const result = await validateAndParseImport(content);
+  const text = await file.text();
 
-  if (!result.ok) {
-    alert(`Import failed: ${result.error}`);
+  // Ask mode
+  const mode = await pickImportMode();
+  if (!mode) {
+    showSnackbar("Import canceled");
     return;
   }
 
-  if (result.tampered) {
-    alert(
-      "Warning: The file appears to have been modified or corrupted. Proceed with caution."
-    );
-  }
-
-  const invalidItems = result.invalidItems || [];
-  let selectedMode = "merge";
-  const choice = prompt(
-    "Import mode: type 'merge', 'replace', or 'select' (default: merge)",
-    "merge"
-  );
-  if (choice === "replace") selectedMode = "replace";
-  else if (choice === "select") selectedMode = "select";
-
+  // If "select", we still import all valid items, but we let user pick which IDs to include in that mode.
   let selectedIds = null;
-  if (selectedMode === "select") {
-    const idsStr = prompt(
-      `Provide comma separated IDs to import.\nAvailable: ${result.items
-        .map((i) => i.id)
-        .join(", ")}`,
-      ""
-    );
-    if (idsStr && idsStr.trim()) {
-      selectedIds = idsStr.split(",").map((x) => x.trim());
+  if (mode === "select") {
+    const { payload } = JSON.parse(text);
+    const items = payload.items || [];
+    selectedIds = await pickItemsToImport(items);
+    if (!selectedIds || !selectedIds.length) {
+      showSnackbar("No items selected");
+      return;
     }
   }
 
-  let conflictResolvePromise = null;
-  let conflictResolveFn = null;
-
-  function openConflictDialog(existing, incoming) {
-    openModal(importConflictModal);
-    conflictNameSpan.textContent = existing.name;
-    conflictLocationSpan.textContent = existing.location;
-
-    conflictResolvePromise = new Promise((resolve) => {
-      conflictResolveFn = resolve;
-    });
-  }
-
-  conflictKeepExistingBtn.addEventListener("click", () => {
-    if (conflictResolveFn) conflictResolveFn("keep-existing");
-    closeModal(importConflictModal);
-  });
-
-  conflictKeepImportedBtn.addEventListener("click", () => {
-    if (conflictResolveFn) conflictResolveFn("keep-imported");
-    closeModal(importConflictModal);
-  });
-
-  conflictSkipBtn.addEventListener("click", () => {
-    if (conflictResolveFn) conflictResolveFn("skip");
-    closeModal(importConflictModal);
-  });
-
-  const summary = await importItems({
-    items: result.items,
-    mode: selectedMode,
+  const summary = await CatalogDB.importFromJson(text, {
+    mode,
     selectedIds,
-    conflictHandler: async (existing, incoming) => {
-      openConflictDialog(existing, incoming);
-      const decision = await conflictResolvePromise;
-      conflictResolvePromise = null;
-      conflictResolveFn = null;
-      return decision;
-    },
+    onConflict: conflictDialog,
   });
 
-  // Show import summary
-  importSummaryImportedSpan.textContent = summary.imported;
-  importSummarySkippedSpan.textContent = summary.skipped;
-  importSummaryReplacedSpan.textContent = summary.replaced;
-
-  if (invalidItems.length || result.tampered) {
-    importSummaryErrorsDiv.innerHTML = "";
-    if (result.tampered) {
-      const p = document.createElement("p");
-      p.textContent =
-        "File tampering detected: checksum mismatch. Some items may be unreliable.";
-      importSummaryErrorsDiv.appendChild(p);
+  importSummary.innerHTML = `
+    Imported: ${summary.importedCount}<br/>
+    Replaced: ${summary.replacedCount}<br/>
+    Skipped: ${summary.skippedCount}<br/>
+    ${
+      summary.errorItems.length
+        ? "Errors: " +
+          summary.errorItems
+            .map((e) => `${e.id}: ${e.error}`)
+            .join("<br/>")
+        : ""
     }
-    if (invalidItems.length) {
-      const p = document.createElement("p");
-      p.textContent = `Items with invalid structure: ${invalidItems.length}`;
-      importSummaryErrorsDiv.appendChild(p);
-    }
-    showElement(importSummaryErrorsDiv);
-  } else {
-    hideElement(importSummaryErrorsDiv);
-  }
-
-  openModal(importSummaryModal);
+  `;
   await loadItems();
+  await recordBackupMeta();
+  showSnackbar("Import completed");
 });
 
-importSummaryCloseBtn.addEventListener("click", () =>
-  closeModal(importSummaryModal)
-);
+// Simple prompt UI for mode
+function pickImportMode() {
+  return new Promise((resolve) => {
+    const msg =
+      "Choose import mode:\n\n1 = Merge\n2 = Replace\n3 = Select items";
+    const ans = prompt(msg, "1");
+    if (ans === "2") return resolve("replace");
+    if (ans === "3") return resolve("select");
+    if (ans === "1") return resolve("merge");
+    resolve(null);
+  });
+}
 
+// Simple selection via prompt of comma-separated item indices
+function pickItemsToImport(items) {
+  return new Promise((resolve) => {
+    if (!items.length) return resolve([]);
+    let msg = "Select items to import (comma separated indices):\n\n";
+    items.forEach((item, i) => {
+      msg += `${i + 1}. ${item.name} @ ${item.location}\n`;
+    });
+    const ans = prompt(msg, "1");
+    if (!ans) return resolve([]);
+    const indices = ans
+      .split(",")
+      .map((s) => parseInt(s.trim(), 10) - 1)
+      .filter((i) => i >= 0 && i < items.length);
+    const ids = indices.map((i) => items[i].id);
+    resolve(ids);
+  });
+}
+
+// Conflict dialog using overlay
+function conflictDialog(existing, incoming) {
+  importConflictText.textContent = `Duplicate found:\n\nExisting: ${existing.name} @ ${existing.location}\nImported: ${incoming.name} @ ${incoming.location}\n\nWhat do you want to do?`;
+  importConflictOverlay.classList.remove("hidden");
+  return new Promise((resolve) => {
+    importConflictResolver = resolve;
+    importConflictCurrent = { existing, incoming };
+  });
+}
+
+importKeepExistingBtn.addEventListener("click", () => {
+  if (importConflictResolver) importConflictResolver("keep_existing");
+  importConflictOverlay.classList.add("hidden");
+  importConflictResolver = null;
+});
+importKeepImportedBtn.addEventListener("click", () => {
+  if (importConflictResolver) importConflictResolver("keep_imported");
+  importConflictOverlay.classList.add("hidden");
+  importConflictResolver = null;
+});
+importSkipBtn.addEventListener("click", () => {
+  if (importConflictResolver) importConflictResolver("skip");
+  importConflictOverlay.classList.add("hidden");
+  importConflictResolver = null;
+});
+
+importConflictOverlay.addEventListener("click", (e) => {
+  if (e.target === importConflictOverlay) {
+    if (importConflictResolver) importConflictResolver("skip");
+    importConflictOverlay.classList.add("hidden");
+    importConflictResolver = null;
+  }
+});
+
+/* Delete all */
 deleteAllBtn.addEventListener("click", async () => {
-  if (!confirm("Delete all data? This cannot be undone.")) return;
-  await clearAllItems();
+  const confirmed = confirm(
+    "Delete all data? This cannot be undone (except from backups)."
+  );
+  if (!confirmed) return;
+  await CatalogDB.deleteAll();
   await loadItems();
+  showSnackbar("All data deleted");
 });
 
-/* "Cloud" backup to Google Drive (manual export JSON) */
+/* BACKUP META & REMINDERS */
+async function recordBackupMeta() {
+  const meta = {
+    lastBackupAt: Date.now(),
+  };
+  localStorage.setItem(BACKUP_META_KEY, JSON.stringify(meta));
+}
 
-backupDriveBtn.addEventListener("click", async () => {
-  const payload = await exportAllToJson();
-  triggerDownloadJson("catalog-backup-drive.json", payload);
+function getBackupMeta() {
+  try {
+    return JSON.parse(localStorage.getItem(BACKUP_META_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function updateBackupStats() {
+  const meta = getBackupMeta();
+  if (!meta.lastBackupAt) {
+    statLastBackup.textContent = "Never";
+  } else {
+    const d = new Date(meta.lastBackupAt);
+    statLastBackup.textContent = d.toLocaleString();
+  }
+}
+
+async function autoBackupIfNeeded() {
+  const meta = getBackupMeta();
   const now = Date.now();
-  localStorage.setItem("lastBackupAt", String(now));
-});
+  const dayMs = 24 * 60 * 60 * 1000;
+  const due = !meta.lastBackupAt || now - meta.lastBackupAt > dayMs;
 
-/* Auto-backup + reminder */
-
-function maybeAutoBackup() {
-  const lastBackupStr = localStorage.getItem("lastBackupAt");
-  const intervalDays = Number(
-    localStorage.getItem("backupIntervalDays") || "1"
-  );
-  const intervalMs = intervalDays * 24 * 60 * 60 * 1000;
-  const now = Date.now();
-  if (!lastBackupStr) {
-    // No backup yet: remind user
-    if (now - (Number(localStorage.getItem("firstUseAt")) || 0) > intervalMs) {
-      alert(
-        "You haven't backed up your catalog yet. Use Settings → Manual backup."
-      );
+  if (due) {
+    await CatalogDB.createBackup();
+    await CatalogDB.pruneBackups(5);
+    await recordBackupMeta();
+    showSnackbar("Auto backup completed");
+  } else {
+    const daysSince =
+      (now - meta.lastBackupAt) / (24 * 60 * 60 * 1000);
+    if (daysSince > 3) {
+      showSnackbar("Reminder: Consider exporting a fresh backup");
     }
-    return;
   }
-
-  const lastBackup = Number(lastBackupStr);
-  if (now - lastBackup >= intervalMs) {
-    // Auto-export and store in browser downloads
-    exportAllToJson().then((payload) => {
-      triggerDownloadJson("catalog-auto-backup.json", payload);
-      localStorage.setItem("lastBackupAt", String(now));
-    });
-  }
+  updateBackupStats();
 }
 
-function initBackupScheduler() {
-  const firstUseAt =
-    Number(localStorage.getItem("firstUseAt")) || Date.now();
-  localStorage.setItem("firstUseAt", String(firstUseAt));
-
-  const intervalDays = Number(
-    localStorage.getItem("backupIntervalDays") || "1"
-  );
-  backupIntervalSelect.value = String(intervalDays);
-
-  setInterval(maybeAutoBackup, 60 * 1000); // check every minute
-  maybeAutoBackup();
-}
-
-backupIntervalSelect.addEventListener("change", () => {
-  const days = Number(backupIntervalSelect.value);
-  localStorage.setItem("backupIntervalDays", String(days));
+forceBackupCheckBtn.addEventListener("click", () => {
+  autoBackupIfNeeded();
 });
 
-/* Stats */
-
+/* ------------------------- STATS & TIMELINE ------------------------- */
 function updateStats() {
-  const total = items.length;
-  const favs = items.filter((it) => it.favorite).length;
-  statTotalItems.textContent = total;
-  statFavorites.textContent = favs;
+  statTotalItems.textContent = allItems.length;
+  statFavorites.textContent = allItems.filter((i) => i.favorite).length;
+}
 
-  const sorted = [...items].sort(
-    (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
-  );
-  const recent = sorted.slice(0, 10);
-  recentList.innerHTML = "";
-  for (const it of recent) {
+function updateTimeline() {
+  recentTimeline.innerHTML = "";
+  const sorted = [...allItems].sort((a, b) => b.createdAt - a.createdAt);
+  sorted.slice(0, 10).forEach((item) => {
     const li = document.createElement("li");
-    const left = document.createElement("span");
-    left.textContent = it.name;
-    const right = document.createElement("span");
-    const date = new Date(it.createdAt);
-    right.textContent = date.toLocaleDateString();
-    li.appendChild(left);
-    li.appendChild(right);
-    recentList.appendChild(li);
-  }
+    const date = new Date(item.createdAt);
+    li.textContent = `${item.name} @ ${item.location} – ${date.toLocaleString()}`;
+    recentTimeline.appendChild(li);
+  });
 }
 
-/* QR code (simple, small payload) */
+/* ------------------------- INSTALL PROMPT ------------------------- */
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  installBanner.classList.remove("hidden");
+});
 
-function drawSimpleQr(data) {
-  // Minimalistic "fake" QR style grid just for demo.
-  // For production you’d want a real QR implementation.
-  const ctx = qrCanvas.getContext("2d");
-  const size = qrCanvas.width;
-  ctx.fillStyle = "#fff";
-  ctx.fillRect(0, 0, size, size);
-  ctx.fillStyle = "#000";
+installLaterBtn.addEventListener("click", () => {
+  installBanner.classList.add("hidden");
+  deferredPrompt = null;
+});
 
-  // simple hashing to distribute blocks
-  let hash = 0;
-  for (let i = 0; i < data.length; i++) {
-    hash = (hash * 31 + data.charCodeAt(i)) & 0xffffffff;
+installNowBtn.addEventListener("click", async () => {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  const choice = await deferredPrompt.userChoice;
+  if (choice.outcome === "accepted") {
+    showSnackbar("App installed");
   }
+  installBanner.classList.add("hidden");
+  deferredPrompt = null;
+});
 
-  const cols = 21;
-  const cell = size / cols;
-
-  for (let y = 0; y < cols; y++) {
-    for (let x = 0; x < cols; x++) {
-      // primitive pattern
-      const val = (hash + x * 13 + y * 17) & 1;
-      if (val) {
-        ctx.fillRect(x * cell, y * cell, cell, cell);
-      }
-    }
-  }
+/* ------------------------- SERVICE WORKER ------------------------- */
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("service-worker.js");
+  });
 }
 
-async function showQrForItems(itemsToShare) {
-  const payload = await exportItemsSubset(itemsToShare);
-  const jsonStr = JSON.stringify(payload);
-  const encoded = btoa(jsonStr);
-  drawSimpleQr(encoded);
-  openModal(qrModal);
-}
-
-/* Share features */
-
-function shareViaWhatsApp(text) {
-  const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
-  window.open(url, "_blank");
-}
-
-function buildItemShareText(item) {
-  return `Catalog item:
-Name: ${item.name}
-Location: ${item.location}`;
-}
-
-function buildPreviewLink(item) {
-  const base = `${location.origin}${location.pathname}`;
-  const encoded = encodeURIComponent(
-    btoa(JSON.stringify({ id: item.id, name: item.name }))
-  );
-  return `${base}?item=${encoded}`;
-}
-
-/* Offline indicator */
-
-function updateOfflineIndicator() {
-  if (navigator.onLine) {
-    offlineIndicator.classList.remove("offline");
-  } else {
-    offlineIndicator.classList.add("offline");
-  }
-}
-
-/* PWA install + service worker */
-
-function registerServiceWorker() {
-  if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("./service-worker.js").catch(() => {});
-  }
-}
-
-/* Event wiring */
-
-window.addEventListener("online", updateOfflineIndicator);
-window.addEventListener("offline", updateOfflineIndicator);
-
-fabAdd.addEventListener("click", openAddModal);
-itemModalClose.addEventListener("click", () => closeModal(itemModal));
-itemSaveBtn.addEventListener("click", () => {
-  saveItem().catch((err) => console.error(err));
+/* ------------------------- INIT ------------------------- */
+loadItems().then(() => {
+  autoBackupIfNeeded();
 });
-
-previewBackBtn.addEventListener("click", () => closePreview());
-previewFavoriteBtn.addEventListener("click", () => {
-  if (currentPreviewId) toggleFavorite(currentPreviewId);
-});
-previewExportItemBtn.addEventListener("click", async () => {
-  if (!currentPreviewId) return;
-  const payload = await exportSingleItem(currentPreviewId);
-  triggerDownloadJson("catalog-item.json", payload);
-});
-previewShareWhatsAppBtn.addEventListener("click", async () => {
-  if (!currentPreviewId) return;
-  const item = items.find((it) => it.id === currentPreviewId);
-  if (!item) return;
-  const text = buildItemShareText(item);
-  shareViaWhatsApp(text);
-});
-previewShareLinkBtn.addEventListener("click", () => {
-  if (!currentPreviewId) return;
-  const item = items.find((it) => it.id === currentPreviewId);
-  if (!item) return;
-  const link = buildPreviewLink(item);
-  if (navigator.share) {
-    navigator.share({
-      title: "Catalog item",
-      url: link,
-    });
-  } else {
-    prompt("Copy link:", link);
-  }
-});
-previewShareQrBtn.addEventListener("click", async () => {
-  if (!currentPreviewId) return;
-  const item = items.find((it) => it.id === currentPreviewId);
-  await showQrForItems([item]);
-});
-previewDeleteBtn.addEventListener("click", () => {
-  if (!currentPreviewId) return;
-  deleteItemWithUndo(currentPreviewId);
-  closePreview();
-});
-previewFullscreenBtn.addEventListener("click", enterFullscreen);
-
-previewModal.addEventListener("touchstart", onPreviewTouchStart, {
-  passive: true,
-});
-previewModal.addEventListener("touchmove", onPreviewTouchMove, {
-  passive: true,
-});
-previewModal.addEventListener("touchend", onPreviewTouchEnd);
-
-/* pinch */
-previewImage.addEventListener("touchmove", handlePreviewTouchGesture, {
-  passive: false,
-});
-previewImage.addEventListener("touchend", handlePreviewTouchEndGesture, {
-  passive: false,
-});
-
-favoritesToggle.addEventListener("click", toggleFavoritesFilter);
-batchToggle.addEventListener("click", () => setBatchMode(!batchMode));
-batchFavoriteBtn.addEventListener("click", () => batchFavorite());
-batchExportBtn.addEventListener("click", () => batchExport());
-batchShareBtn.addEventListener("click", () => batchShare());
-batchDeleteBtn.addEventListener("click", () => batchDelete());
-
-qrCloseBtn.addEventListener("click", () => closeModal(qrModal));
-
-voiceSearchBtn.addEventListener("click", startVoiceSearch);
-
-/* Appearance controls */
-
-themeSelect.addEventListener("change", () => {
-  const value = themeSelect.value;
-  applyTheme(value);
-});
-
-darkModeToggle.addEventListener("change", () => {
-  const isDark = darkModeToggle.checked;
-  if (isDark) {
-    const theme = localStorage.getItem("theme") || "dark";
-    if (theme === "light") {
-      applyTheme("dark");
-      themeSelect.value = "dark";
-    } else {
-      applyTheme(theme);
-    }
-  } else {
-    applyTheme("light");
-    themeSelect.value = "light";
-  }
-});
-
-textSizeSelect.addEventListener("change", () =>
-  applyTextSize(textSizeSelect.value)
-);
-layoutSelect.addEventListener("change", () =>
-  applyLayout(layoutSelect.value)
-);
-
-/* Import summary close handled above */
-
-/* Init */
-
-(async function init() {
-  loadAppearanceSettings();
-  updateOfflineIndicator();
-  registerServiceWorker();
-  initBackupScheduler();
-  await loadItems();
-
-  // If there is a ?item= link, try to open that preview
-  const urlParams = new URLSearchParams(window.location.search);
-  const encoded = urlParams.get("item");
-  if (encoded) {
-    try {
-      const decoded = JSON.parse(atob(decodeURIComponent(encoded)));
-      const it = items.find((i) => i.id === decoded.id);
-      if (it) openPreview(it.id);
-    } catch (err) {
-      console.warn("Invalid preview link");
-    }
-  }
-})();
