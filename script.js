@@ -1,944 +1,1131 @@
 // script.js
+// UI logic, interaction, swipe, voice search, QR, backup, etc.
 
-const itemsGrid = document.getElementById('itemsGrid');
-const skeletonContainer = document.getElementById('skeletonContainer');
-const searchInput = document.getElementById('searchInput');
-const favoriteFilter = document.getElementById('favoriteFilter');
-const layoutSelect = document.getElementById('layoutSelect');
-const textSizeSelect = document.getElementById('textSizeSelect');
-const themeToggle = document.getElementById('themeToggle');
-const offlineIndicator = document.getElementById('offlineIndicator');
+import {
+  addItem,
+  updateItem,
+  deleteItem,
+  clearAllItems,
+  getAllItems,
+  getItemById,
+  exportAllToJson,
+  exportItemsSubset,
+  exportSingleItem,
+  triggerDownloadJson,
+  validateAndParseImport,
+  importItems,
+  setMeta,
+  getMeta,
+} from "./db.js";
 
-const fabMain = document.getElementById('fabMain');
-const fabMenu = document.getElementById('fabMenu');
+/* State */
 
-const pageHome = document.getElementById('pageHome');
-const pagePreview = document.getElementById('pagePreview');
-const pageSettings = document.getElementById('pageSettings');
-const pageStats = document.getElementById('pageStats');
-const pages = { home: pageHome, preview: pagePreview, settings: pageSettings, stats: pageStats };
-
-const navButtons = document.querySelectorAll('.nav-btn');
-
-const previewCloseBtn = document.getElementById('previewCloseBtn');
-const previewImage = document.getElementById('previewImage');
-const previewName = document.getElementById('previewName');
-const previewLocation = document.getElementById('previewLocation');
-const previewFavoriteBtn = document.getElementById('previewFavoriteBtn');
-const previewExportBtn = document.getElementById('previewExportBtn');
-const previewShareWhatsAppBtn = document.getElementById('previewShareWhatsAppBtn');
-const previewShareQRBtn = document.getElementById('previewShareQRBtn');
-const previewShareLinkBtn = document.getElementById('previewShareLinkBtn');
-const previewDeleteBtn = document.getElementById('previewDeleteBtn');
-const hiddenCanvas = document.getElementById('hiddenCanvas');
-
-const qrModal = document.getElementById('qrModal');
-const qrCloseBtn = document.getElementById('qrCloseBtn');
-const qrContainer = document.getElementById('qrContainer');
-
-const snackbar = document.getElementById('snackbar');
-
-const conflictModal = document.getElementById('conflictModal');
-const conflictText = document.getElementById('conflictText');
-const conflictKeepExistingBtn = document.getElementById('conflictKeepExistingBtn');
-const conflictKeepImportedBtn = document.getElementById('conflictKeepImportedBtn');
-const conflictSkipBtn = document.getElementById('conflictSkipBtn');
-
-const importModeModal = document.getElementById('importModeModal');
-const importSelectModal = document.getElementById('importSelectModal');
-const importSelectList = document.getElementById('importSelectList');
-const importSelectConfirmBtn = document.getElementById('importSelectConfirmBtn');
-const importSelectCancelBtn = document.getElementById('importSelectCancelBtn');
-
-const exportAllBtn = document.getElementById('exportAllBtn');
-const importBtn = document.getElementById('importBtn');
-const importFileInput = document.getElementById('importFileInput');
-
-const backupNowBtn = document.getElementById('backupNowBtn');
-const backupDaysInput = document.getElementById('backupDaysInput');
-const lastBackupInfo = document.getElementById('lastBackupInfo');
-
-const statTotalItems = document.getElementById('statTotalItems');
-const recentTimeline = document.getElementById('recentTimeline');
-
-const batchToolbar = document.getElementById('batchToolbar');
-const batchCount = document.getElementById('batchCount');
-const batchClearBtn = document.getElementById('batchClearBtn');
-
-const voiceSearchBtn = document.getElementById('voiceSearchBtn');
-const homeLogo = document.getElementById('homeLogo');
-
-// State
 let items = [];
 let filteredItems = [];
-let currentPreviewIndex = -1;
-let lastPreviewCardId = null;
-let isPreviewOpen = false;
+let favoritesOnly = false;
 let batchMode = false;
-let batchSelectedIds = new Set();
-let importConflictResolver = null;
-let pendingImportParsed = null;
-let pendingImportMode = 'merge';
-let pendingImportSelectedIds = null;
+let batchSelection = new Set();
+let lastDeleted = null;
+let lastDeletedTimeout = null;
 
-// Local storage keys for preferences
-const PREF_KEY_THEME = 'catalog-theme';
-const PREF_KEY_TEXT_SIZE = 'catalog-text-size';
-const PREF_KEY_LAYOUT = 'catalog-layout';
-const PREF_KEY_BACKUP_DAYS = 'catalog-backup-days';
+let currentPreviewId = null;
+let previewIndex = -1;
 
-// Utils
-function showSnackbar(message, withUndo = false, onUndo = null) {
-  snackbar.textContent = '';
-  snackbar.classList.remove('show');
+let touchStartX = null;
+let touchStartY = null;
 
-  const textSpan = document.createElement('span');
-  textSpan.textContent = message;
-  snackbar.appendChild(textSpan);
+/* DOM */
 
-  if (withUndo && onUndo) {
-    const undoBtn = document.createElement('button');
-    undoBtn.textContent = 'Undo';
-    undoBtn.addEventListener('click', () => {
-      onUndo();
-      snackbar.classList.remove('show');
-    });
-    snackbar.appendChild(undoBtn);
+const catalogGrid = document.getElementById("catalog-grid");
+const skeletonContainer = document.getElementById("skeleton-container");
+const emptyState = document.getElementById("empty-state");
+
+const fabAdd = document.getElementById("fab-add");
+const itemModal = document.getElementById("item-modal");
+const itemModalClose = document.getElementById("item-modal-close");
+const itemModalTitle = document.getElementById("item-modal-title");
+const itemForm = document.getElementById("item-form");
+const itemNameInput = document.getElementById("item-name");
+const itemLocationInput = document.getElementById("item-location");
+const itemImageInput = document.getElementById("item-image");
+const itemSaveBtn = document.getElementById("item-save-btn");
+
+const previewModal = document.getElementById("preview-modal");
+const previewBackBtn = document.getElementById("preview-back-btn");
+const previewImage = document.getElementById("preview-image");
+const previewName = document.getElementById("preview-name");
+const previewLocation = document.getElementById("preview-location");
+const previewTitle = document.getElementById("preview-title");
+const previewFavoriteBtn = document.getElementById("preview-favorite-btn");
+const previewExportItemBtn = document.getElementById(
+  "preview-export-item-btn"
+);
+const previewShareWhatsAppBtn = document.getElementById(
+  "preview-share-whatsapp-btn"
+);
+const previewShareQrBtn = document.getElementById("preview-share-qr-btn");
+const previewShareLinkBtn = document.getElementById("preview-share-link-btn");
+const previewDeleteBtn = document.getElementById("preview-delete-btn");
+const previewFullscreenBtn = document.getElementById(
+  "preview-fullscreen-btn"
+);
+
+const qrModal = document.getElementById("qr-modal");
+const qrCloseBtn = document.getElementById("qr-close-btn");
+const qrCanvas = document.getElementById("qr-canvas");
+
+const favoritesToggle = document.getElementById("favorites-toggle");
+const batchToggle = document.getElementById("batch-toggle");
+const batchBar = document.getElementById("batch-bar");
+const batchCount = document.getElementById("batch-count");
+const batchFavoriteBtn = document.getElementById("batch-favorite-btn");
+const batchExportBtn = document.getElementById("batch-export-btn");
+const batchShareBtn = document.getElementById("batch-share-btn");
+const batchDeleteBtn = document.getElementById("batch-delete-btn");
+
+const offlineIndicator = document.getElementById("offline-indicator");
+
+const snackbar = document.getElementById("snackbar");
+const snackbarMessage = document.getElementById("snackbar-message");
+const snackbarUndoBtn = document.getElementById("snackbar-undo-btn");
+
+const searchInput = document.getElementById("search-input");
+const voiceSearchBtn = document.getElementById("voice-search-btn");
+
+const bottomNavButtons = document.querySelectorAll(".bottom-nav-btn");
+const pages = document.querySelectorAll(".page");
+const logoButton = document.getElementById("logo-button");
+
+const settingsOpenBtn = document.getElementById("settings-open-btn");
+const themeSelect = document.getElementById("theme-select");
+const darkModeToggle = document.getElementById("dark-mode-toggle");
+const textSizeSelect = document.getElementById("text-size-select");
+const layoutSelect = document.getElementById("layout-select");
+
+const exportAllBtn = document.getElementById("export-all-btn");
+const importBtn = document.getElementById("import-btn");
+const importFileInput = document.getElementById("import-file-input");
+const deleteAllBtn = document.getElementById("delete-all-btn");
+const backupDriveBtn = document.getElementById("backup-drive-btn");
+const backupIntervalSelect = document.getElementById(
+  "backup-interval-select"
+);
+
+const statTotalItems = document.getElementById("stat-total-items");
+const statFavorites = document.getElementById("stat-favorites");
+const recentList = document.getElementById("recent-list");
+
+const importConflictModal = document.getElementById("import-conflict-modal");
+const conflictNameSpan = document.getElementById("conflict-name");
+const conflictLocationSpan = document.getElementById("conflict-location");
+const conflictKeepExistingBtn = document.getElementById(
+  "conflict-keep-existing-btn"
+);
+const conflictKeepImportedBtn = document.getElementById(
+  "conflict-keep-imported-btn"
+);
+const conflictSkipBtn = document.getElementById("conflict-skip-btn");
+
+const importSummaryModal = document.getElementById("import-summary-modal");
+const importSummaryImportedSpan = document.getElementById(
+  "import-summary-imported"
+);
+const importSummarySkippedSpan = document.getElementById(
+  "import-summary-skipped"
+);
+const importSummaryReplacedSpan = document.getElementById(
+  "import-summary-replaced"
+);
+const importSummaryErrorsDiv = document.getElementById(
+  "import-summary-errors"
+);
+const importSummaryCloseBtn = document.getElementById(
+  "import-summary-close-btn"
+);
+
+/* Utility */
+
+function showElement(el) {
+  el.classList.remove("hidden");
+}
+function hideElement(el) {
+  el.classList.add("hidden");
+}
+
+function openModal(el) {
+  el.classList.remove("hidden");
+}
+function closeModal(el) {
+  el.classList.add("hidden");
+}
+
+function showSnackbar(message, undoCallback) {
+  snackbarMessage.textContent = message;
+  snackbar.classList.remove("hidden");
+  if (lastDeletedTimeout) {
+    clearTimeout(lastDeletedTimeout);
   }
+  lastDeletedTimeout = setTimeout(() => {
+    snackbar.classList.add("hidden");
+    lastDeleted = null;
+  }, 4000);
 
-  requestAnimationFrame(() => {
-    snackbar.classList.add('show');
-  });
-
-  setTimeout(() => {
-    snackbar.classList.remove('show');
-  }, 3500);
+  snackbarUndoBtn.onclick = () => {
+    if (undoCallback) undoCallback();
+    snackbar.classList.add("hidden");
+    lastDeleted = null;
+  };
 }
 
-function setActivePage(name) {
-  Object.values(pages).forEach(p => p.classList.remove('active'));
-  pages[name].classList.add('active');
-
-  navButtons.forEach(b => {
-    b.classList.toggle('active', b.dataset.nav === name);
-  });
-}
-
-// Offline indicator
-function updateOfflineIndicator() {
-  if (!navigator.onLine) {
-    offlineIndicator.classList.add('offline');
-    offlineIndicator.title = 'Offline';
-  } else {
-    offlineIndicator.classList.remove('offline');
-    offlineIndicator.title = 'Online';
-  }
-}
-
-// Rendering
-function renderItemsList() {
-  itemsGrid.innerHTML = '';
-  filteredItems.forEach((item, index) => {
-    const card = document.createElement('div');
-    card.className = 'card';
-    card.dataset.id = item.id;
-    card.dataset.index = index;
-
-    const img = document.createElement('img');
-    img.src = item.imageDataUrl;
-    img.loading = 'lazy';
-
-    const fav = document.createElement('div');
-    fav.className = 'card-favorite' + (item.favorite ? ' active' : '');
-    fav.innerHTML = item.favorite ? '★' : '☆';
-
-    const checkboxWrap = document.createElement('div');
-    checkboxWrap.className = 'card-checkbox';
-    const checkboxSpan = document.createElement('span');
-    checkboxSpan.textContent = batchSelectedIds.has(item.id) ? '✓' : '';
-    checkboxWrap.appendChild(checkboxSpan);
-
-    card.appendChild(img);
-    card.appendChild(fav);
-    card.appendChild(checkboxWrap);
-
-    card.addEventListener('click', e => {
-      if (batchMode) {
-        toggleBatchSelection(item.id);
-      } else {
-        openPreviewByIndex(index);
-      }
-    });
-
-    itemsGrid.appendChild(card);
-  });
-
-  skeletonContainer.classList.add('hidden');
-  itemsGrid.classList.remove('hidden');
-}
-
-function applyFilters() {
-  const q = (searchInput.value || '').toLowerCase();
-  const favMode = favoriteFilter.value;
-
-  filteredItems = items.filter(item => {
-    let ok = true;
-    if (q) {
-      ok =
-        item.name.toLowerCase().includes(q) ||
-        item.location.toLowerCase().includes(q);
-    }
-    if (favMode === 'favorites') {
-      ok = ok && !!item.favorite;
-    }
-    return ok;
-  });
-
-  renderItemsList();
-  updateStats();
-}
-
-async function loadItemsInitial() {
-  skeletonContainer.classList.remove('hidden');
-  itemsGrid.classList.add('hidden');
-
-  items = await window.CatalogDB.getAllItems();
-  filteredItems = items.slice();
-  renderItemsList();
-}
-
-// Preview
-function openPreviewByIndex(idx) {
-  if (idx < 0 || idx >= filteredItems.length) return;
-  const item = filteredItems[idx];
-  currentPreviewIndex = idx;
-  lastPreviewCardId = item.id;
-
-  previewImage.src = item.imageDataUrl;
-  previewName.textContent = item.name;
-  previewLocation.textContent = item.location;
-  previewFavoriteBtn.textContent = item.favorite ? 'Unfavorite' : 'Favorite';
-
-  isPreviewOpen = true;
-  setActivePage('preview');
-}
-
-function closePreview() {
-  isPreviewOpen = false;
-  setActivePage('home');
-
-  if (lastPreviewCardId) {
-    const card = itemsGrid.querySelector(`.card[data-id="${lastPreviewCardId}"]`);
-    if (card) {
-      card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      card.classList.add('highlight');
-      setTimeout(() => card.classList.remove('highlight'), 900);
-    }
-  }
-}
-
-// Swipe handling for preview
-(function initSwipe() {
-  let startX = null;
-
-  pagePreview.addEventListener('touchstart', e => {
-    if (!isPreviewOpen) return;
-    if (e.touches.length === 1) {
-      startX = e.touches[0].clientX;
-    }
-  });
-
-  pagePreview.addEventListener('touchend', e => {
-    if (!isPreviewOpen || startX == null) return;
-    const endX = e.changedTouches[0].clientX;
-    const dx = endX - startX;
-    if (Math.abs(dx) > 40) {
-      if (dx < 0 && currentPreviewIndex < filteredItems.length - 1) {
-        openPreviewByIndex(currentPreviewIndex + 1);
-      } else if (dx > 0 && currentPreviewIndex > 0) {
-        openPreviewByIndex(currentPreviewIndex - 1);
-      }
-    }
-    startX = null;
-  });
-})();
-
-// Simple pinch-zoom / full-screen behavior
-(function initImageInteraction() {
-  let scale = 1;
-  let isFullscreen = false;
-
-  previewImage.addEventListener('click', () => {
-    isFullscreen = !isFullscreen;
-    if (isFullscreen) {
-      previewImage.style.maxHeight = '100vh';
-      previewImage.style.cursor = 'zoom-out';
-    } else {
-      previewImage.style.maxHeight = '280px';
-      previewImage.style.cursor = 'zoom-in';
-      previewImage.style.transform = 'scale(1)';
-      scale = 1;
-    }
-  });
-
-  previewImage.addEventListener('wheel', e => {
-    if (!isFullscreen) return;
-    e.preventDefault();
-    const delta = e.deltaY < 0 ? 0.1 : -0.1;
-    scale = Math.max(1, Math.min(3, scale + delta));
-    previewImage.style.transform = `scale(${scale})`;
-  }, { passive: false });
-})();
-
-// QR generation (very simple: draw text on canvas; you can later swap with real QR library)
-function generateFakeQR(data) {
-  qrContainer.innerHTML = '';
-  const canvas = hiddenCanvas;
-  const ctx = canvas.getContext('2d');
-  const size = 220;
-  canvas.width = size;
-  canvas.height = size;
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, size, size);
-  ctx.fillStyle = '#000000';
-  ctx.font = '12px monospace';
-  ctx.fillText('QR DATA:', 10, 20);
-  const lines = data.match(/.{1,22}/g) || [];
-  lines.slice(0, 10).forEach((line, i) => {
-    ctx.fillText(line, 10, 40 + i * 16);
-  });
-  const img = document.createElement('img');
-  img.src = canvas.toDataURL('image/png');
-  img.alt = 'QR code';
-  img.style.width = '220px';
-  img.style.height = '220px';
-  qrContainer.appendChild(img);
-}
-
-// File helpers
-function downloadJson(obj, filename) {
-  const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
-
-// Add item via prompt (simplified for now)
-async function handleAddItem() {
-  const name = prompt('Item name:');
-  if (!name) return;
-  const location = prompt('Location:') || '';
-  const imageFile = await pickImageFile();
-  if (!imageFile) return;
-
-  const imageDataUrl = await fileToDataURL(imageFile);
-  const item = await window.CatalogDB.addItem({ name, location, imageDataUrl });
-  items.unshift(item);
-  applyFilters();
-  showSnackbar('Item added');
-}
-
-function pickImageFile() {
-  return new Promise(resolve => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.onchange = () => resolve(input.files[0] || null);
-    input.click();
-  });
-}
-
-function fileToDataURL(file) {
+function readFileAsBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = e => resolve(e.target.result);
-    reader.onerror = reject;
+    reader.onerror = () => reject(reader.error);
+    reader.onload = () => resolve(reader.result);
     reader.readAsDataURL(file);
   });
 }
 
-// Batch selection
-function toggleBatchSelection(id) {
-  if (batchSelectedIds.has(id)) {
-    batchSelectedIds.delete(id);
-  } else {
-    batchSelectedIds.add(id);
-  }
-  updateBatchUI();
+/* Load and render items */
+
+async function loadItems() {
+  showElement(skeletonContainer);
+  items = await getAllItems();
+  hideElement(skeletonContainer);
+  applyFiltersAndRender();
 }
 
-function updateBatchUI() {
-  const count = batchSelectedIds.size;
-  if (count > 0) {
-    batchMode = true;
-    batchToolbar.classList.remove('hidden');
-  } else {
-    batchMode = false;
-    batchToolbar.classList.add('hidden');
-  }
-  batchCount.textContent = `${count} selected`;
-  itemsGrid.querySelectorAll('.card').forEach(card => {
-    const id = card.dataset.id;
-    const checkbox = card.querySelector('.card-checkbox span');
-    if (batchSelectedIds.has(id)) {
-      card.classList.add('selected');
-      checkbox.textContent = '✓';
-    } else {
-      card.classList.remove('selected');
-      checkbox.textContent = '';
-    }
+function applyFiltersAndRender() {
+  const query = (searchInput.value || "").trim().toLowerCase();
+  filteredItems = items.filter((item) => {
+    if (favoritesOnly && !item.favorite) return false;
+    if (!query) return true;
+    const name = item.name.toLowerCase();
+    const loc = item.location.toLowerCase();
+    return name.includes(query) || loc.includes(query);
   });
+  renderGrid();
+  updateStats();
 }
 
-function clearBatchSelection() {
-  batchSelectedIds.clear();
-  updateBatchUI();
-}
+function renderGrid() {
+  catalogGrid.innerHTML = "";
+  if (!filteredItems.length) {
+    showElement(emptyState);
+    return;
+  }
+  hideElement(emptyState);
 
-// Batch actions
-async function performBatchAction(action) {
-  const ids = Array.from(batchSelectedIds);
-  if (!ids.length) return;
+  filteredItems.forEach((item) => {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.dataset.id = item.id;
 
-  if (action === 'delete') {
-    if (!confirm(`Delete ${ids.length} items?`)) return;
-    const backups = [];
-    for (const id of ids) {
-      const item = items.find(it => it.id === id);
-      if (item) backups.push(item);
-      await window.CatalogDB.deleteItem(id);
+    const inner = document.createElement("div");
+    inner.className = "card-inner";
+
+    const img = document.createElement("img");
+    img.loading = "lazy";
+    img.src = item.image;
+    img.alt = item.name || "Item";
+
+    inner.appendChild(img);
+
+    if (item.favorite) {
+      const favTag = document.createElement("div");
+      favTag.className = "card-favorite";
+      favTag.textContent = "★ Fav";
+      inner.appendChild(favTag);
     }
-    items = items.filter(it => !ids.includes(it.id));
-    clearBatchSelection();
-    applyFilters();
-    showSnackbar(`${ids.length} items deleted`, true, async () => {
-      // Simple restore
-      for (const item of backups) {
-        await window.CatalogDB.updateItem(item);
+
+    if (batchMode) {
+      const sel = document.createElement("div");
+      sel.className = "card-select";
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.checked = batchSelection.has(item.id);
+      checkbox.addEventListener("click", (e) => {
+        e.stopPropagation();
+        toggleBatchSelection(item.id);
+      });
+      sel.appendChild(checkbox);
+      inner.appendChild(sel);
+    }
+
+    card.appendChild(inner);
+
+    // 3D tilt for pointer
+    card.addEventListener("mousemove", (e) => handleCardTilt(e, card));
+    card.addEventListener("mouseleave", () => resetCardTilt(card));
+
+    card.addEventListener("click", () => {
+      if (batchMode) {
+        toggleBatchSelection(item.id);
+      } else {
+        openPreview(item.id);
       }
-      items = await window.CatalogDB.getAllItems();
-      applyFilters();
     });
-  } else if (action === 'favorite') {
-    for (const id of ids) {
-      const item = items.find(it => it.id === id);
-      if (!item) continue;
-      const newFav = !item.favorite;
-      item.favorite = newFav;
-      await window.CatalogDB.toggleFavorite(id, newFav);
+
+    catalogGrid.appendChild(card);
+  });
+
+  updateBatchBar();
+}
+
+function handleCardTilt(e, card) {
+  const rect = card.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  const pctX = (x / rect.width) * 2 - 1;
+  const pctY = (y / rect.height) * 2 - 1;
+  const rx = (-pctY * 8).toFixed(2) + "deg";
+  const ry = (pctX * 8).toFixed(2) + "deg";
+  card.style.setProperty("--rx", rx);
+  card.style.setProperty("--ry", ry);
+}
+
+function resetCardTilt(card) {
+  card.style.setProperty("--rx", "0deg");
+  card.style.setProperty("--ry", "0deg");
+}
+
+/* Preview logic */
+
+function openPreview(id) {
+  currentPreviewId = id;
+  previewIndex = filteredItems.findIndex((it) => it.id === id);
+  const item = items.find((it) => it.id === id);
+  if (!item) return;
+
+  previewImage.src = item.image;
+  previewName.textContent = item.name;
+  previewLocation.textContent = item.location;
+  previewTitle.textContent = item.name || "Item";
+  previewFavoriteBtn.textContent = item.favorite ? "★" : "☆";
+
+  openModal(previewModal);
+
+  // Scroll to card and highlight after closing
+}
+
+function closePreview() {
+  const id = currentPreviewId;
+  closeModal(previewModal);
+  if (!id) return;
+  setTimeout(() => scrollAndHighlightCard(id), 150);
+}
+
+function scrollAndHighlightCard(id) {
+  const card = catalogGrid.querySelector(`.card[data-id="${id}"]`);
+  if (!card) return;
+  card.scrollIntoView({ behavior: "smooth", block: "center" });
+  card.classList.add("card-highlight");
+  setTimeout(() => card.classList.remove("card-highlight"), 800);
+}
+
+/* Swipe navigation in preview */
+
+function onPreviewTouchStart(e) {
+  if (!e.touches || e.touches.length !== 1) return;
+  touchStartX = e.touches[0].clientX;
+  touchStartY = e.touches[0].clientY;
+}
+
+function onPreviewTouchMove(e) {
+  if (touchStartX == null || touchStartY == null) return;
+  const dx = e.touches[0].clientX - touchStartX;
+  const dy = e.touches[0].clientY - touchStartY;
+  if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
+    if (dx > 0) {
+      // swipe right -> previous
+      goPrevPreview();
+    } else {
+      // swipe left -> next
+      goNextPreview();
     }
-    applyFilters();
-  } else if (action === 'export') {
-    const subset = items.filter(it => ids.includes(it.id));
-    downloadJson(
-      {
-        version: 1,
-        exportedAt: Date.now(),
-        items: subset
-      },
-      `catalog-selected-${Date.now()}.json`
-    );
-  } else if (action === 'share') {
-    const subset = items.filter(it => ids.includes(it.id));
-    const text = subset.map(it => `${it.name} @ ${it.location}`).join('\n');
-    shareText(text);
+    touchStartX = null;
+    touchStartY = null;
   }
 }
 
-// Share helpers
-function shareText(text) {
-  const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
-  if (navigator.share) {
-    navigator.share({ text }).catch(() => {
-      window.open(whatsappUrl, '_blank');
-    });
-  } else {
-    window.open(whatsappUrl, '_blank');
+function onPreviewTouchEnd() {
+  touchStartX = null;
+  touchStartY = null;
+}
+
+function goPrevPreview() {
+  if (previewIndex <= 0) return;
+  previewIndex -= 1;
+  const item = filteredItems[previewIndex];
+  openPreview(item.id);
+}
+
+function goNextPreview() {
+  if (previewIndex >= filteredItems.length - 1) return;
+  previewIndex += 1;
+  const item = filteredItems[previewIndex];
+  openPreview(item.id);
+}
+
+/* Pinch-to-zoom + fullscreen (simple) */
+
+let lastScale = 1;
+let initialDistance = null;
+
+function handlePreviewTouchGesture(e) {
+  if (e.touches.length === 2) {
+    e.preventDefault();
+    const [t1, t2] = e.touches;
+    const dx = t2.clientX - t1.clientX;
+    const dy = t2.clientY - t1.clientY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (!initialDistance) {
+      initialDistance = dist;
+      return;
+    }
+    const scale = Math.min(3, Math.max(1, (dist / initialDistance) * lastScale));
+    previewImage.style.transform = `scale(${scale})`;
   }
 }
 
-function shareLink(link, title = 'Catalog item') {
-  if (navigator.share) {
-    navigator.share({ title, url: link }).catch(() => {
-      navigator.clipboard?.writeText(link);
-      showSnackbar('Link copied to clipboard');
-    });
-  } else {
-    navigator.clipboard?.writeText(link);
-    showSnackbar('Link copied to clipboard');
+function handlePreviewTouchEndGesture(e) {
+  if (e.touches.length < 2) {
+    lastScale = 1;
+    initialDistance = null;
+    setTimeout(() => {
+      previewImage.style.transform = "scale(1)";
+    }, 150);
   }
 }
 
-// Voice search
-function initVoiceSearch() {
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SpeechRecognition) {
-    voiceSearchBtn.disabled = true;
+function enterFullscreen() {
+  if (previewImage.requestFullscreen) {
+    previewImage.requestFullscreen();
+  } else if (previewImage.webkitRequestFullscreen) {
+    previewImage.webkitRequestFullscreen();
+  }
+}
+
+/* Add/edit item */
+
+let editingItemId = null;
+
+function openAddModal() {
+  editingItemId = null;
+  itemModalTitle.textContent = "Add item";
+  itemForm.reset();
+  openModal(itemModal);
+}
+
+async function openEditModal(id) {
+  const item = items.find((it) => it.id === id);
+  if (!item) return;
+  editingItemId = id;
+  itemModalTitle.textContent = "Edit item";
+  itemNameInput.value = item.name;
+  itemLocationInput.value = item.location;
+  itemImageInput.value = "";
+  openModal(itemModal);
+}
+
+async function saveItem() {
+  const name = itemNameInput.value.trim();
+  const location = itemLocationInput.value.trim();
+  if (!name || !location) return;
+
+  let base64Image = null;
+  const file = itemImageInput.files[0];
+  if (file) {
+    base64Image = await readFileAsBase64(file);
+  }
+
+  if (!editingItemId && !base64Image) {
+    alert("Image is required for new items.");
     return;
   }
 
-  const recog = new SpeechRecognition();
-  recog.lang = 'en-US';
-  recog.interimResults = false;
-  recog.maxAlternatives = 1;
-
-  voiceSearchBtn.addEventListener('click', () => {
-    try {
-      recog.start();
-    } catch {}
-  });
-
-  recog.onresult = e => {
-    const text = e.results[0][0].transcript;
-    searchInput.value = text;
-    applyFilters();
-  };
-}
-
-// Import / export / conflicts / tamper detection
-function openImportModeDialog(parsed) {
-  pendingImportParsed = parsed;
-  importModeModal.classList.remove('hidden');
-}
-
-function closeImportModeDialog() {
-  importModeModal.classList.add('hidden');
-}
-
-function openImportSelectDialog(itemsList) {
-  importSelectList.innerHTML = '';
-  itemsList.forEach(item => {
-    const div = document.createElement('div');
-    div.className = 'import-select-item';
-    div.dataset.id = item.id;
-
-    const img = document.createElement('img');
-    img.src = item.imageDataUrl;
-    const span = document.createElement('span');
-    span.textContent = `${item.name} @ ${item.location}`;
-
-    const checkbox = document.createElement('input');
-    checkbox.type = 'checkbox';
-    checkbox.checked = true;
-
-    div.appendChild(checkbox);
-    div.appendChild(img);
-    div.appendChild(span);
-
-    importSelectList.appendChild(div);
-  });
-  importSelectModal.classList.remove('hidden');
-}
-
-function closeImportSelectDialog() {
-  importSelectModal.classList.add('hidden');
-}
-
-function openConflictDialog(existing, incoming) {
-  return new Promise(resolve => {
-    conflictText.textContent = `Item "${incoming.name}" at "${incoming.location}" already exists.`;
-    conflictModal.classList.remove('hidden');
-
-    const handler = choice => {
-      conflictModal.classList.add('hidden');
-      resolve(choice);
-      conflictKeepExistingBtn.removeEventListener('click', onKeepExisting);
-      conflictKeepImportedBtn.removeEventListener('click', onKeepImported);
-      conflictSkipBtn.removeEventListener('click', onSkip);
-    };
-
-    const onKeepExisting = () => handler('keepExisting');
-    const onKeepImported = () => handler('keepImported');
-    const onSkip = () => handler('skip');
-
-    conflictKeepExistingBtn.addEventListener('click', onKeepExisting);
-    conflictKeepImportedBtn.addEventListener('click', onKeepImported);
-    conflictSkipBtn.addEventListener('click', onSkip);
-  });
-}
-
-async function handleExportAll() {
-  const data = await window.CatalogDB.exportAllItems();
-  downloadJson(data, `catalog-export-${Date.now()}.json`);
-}
-
-function handleImportStart() {
-  importFileInput.value = '';
-  importFileInput.click();
-}
-
-function handleFileImport(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = async ev => {
-    try {
-      const parsed = JSON.parse(ev.target.result);
-      openImportModeDialog(parsed);
-    } catch {
-      alert('Invalid JSON file');
+  if (editingItemId) {
+    const existing = await getItemById(editingItemId);
+    if (!existing) return;
+    const updated = { ...existing, name, location };
+    if (base64Image) {
+      updated.image = base64Image;
     }
-  };
-  reader.readAsText(file);
-}
-
-async function runImport(mode, selectedIds) {
-  closeImportModeDialog();
-  closeImportSelectDialog();
-
-  if (!pendingImportParsed) return;
-
-  importConflictResolver = (existing, incoming) => openConflictDialog(existing, incoming);
-
-  const result = await window.CatalogDB.importItemsFromJson(
-    pendingImportParsed,
-    {
-      mode,
-      selectedIds,
-      conflictResolver: importConflictResolver
-    }
-  );
-
-  if (result.tampered || result.tamperedItems.length > 0) {
-    alert(
-      `Warning: Some imported items may be corrupted or manually modified.\n` +
-      `Tampered count: ${result.tamperedItems.length}`
-    );
-  }
-
-  showSnackbar(
-    `Imported: ${result.imported}, skipped: ${result.skipped}, replaced: ${result.replaced}`
-  );
-
-  items = await window.CatalogDB.getAllItems();
-  applyFilters();
-  pendingImportParsed = null;
-}
-
-// Settings: theme / text size / layout
-function applyTheme(theme) {
-  const body = document.body;
-  if (theme === 'light') {
-    body.classList.remove('theme-dark');
-    body.classList.add('theme-light');
-    themeToggle.checked = false;
+    updated.updatedAt = new Date().toISOString();
+    updated.checksum = await cryptoChecksumItem(updated);
+    await updateItem(updated);
   } else {
-    body.classList.add('theme-dark');
-    body.classList.remove('theme-light');
-    themeToggle.checked = true;
+    const id = crypto.randomUUID();
+    const item = {
+      id,
+      name,
+      location,
+      image: base64Image,
+      favorite: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    item.checksum = await cryptoChecksumItem(item);
+    await addItem(item);
   }
-  localStorage.setItem(PREF_KEY_THEME, theme);
+
+  closeModal(itemModal);
+  await loadItems();
+}
+
+/* Item checksum based on content (for duplicate detection) */
+
+async function cryptoChecksumItem(item) {
+  const minimal = {
+    name: item.name,
+    location: item.location,
+    image: item.image,
+  };
+  const str = JSON.stringify(minimal);
+  const enc = new TextEncoder();
+  const bytes = enc.encode(str);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  const arr = Array.from(new Uint8Array(digest));
+  return arr.map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/* Favorites */
+
+async function toggleFavorite(id) {
+  const it = await getItemById(id);
+  if (!it) return;
+  it.favorite = !it.favorite;
+  it.updatedAt = new Date().toISOString();
+  await updateItem(it);
+  await loadItems();
+}
+
+/* Delete + undo */
+
+async function deleteItemWithUndo(id) {
+  const item = await getItemById(id);
+  if (!item) return;
+  lastDeleted = item;
+  await deleteItem(id);
+  await loadItems();
+  showSnackbar("Item deleted", async () => {
+    if (lastDeleted) {
+      await addItem(lastDeleted);
+      await loadItems();
+    }
+  });
+}
+
+async function deleteMultiple(ids) {
+  for (const id of ids) {
+    await deleteItem(id);
+  }
+  await loadItems();
+}
+
+/* Batch actions */
+
+function setBatchMode(enabled) {
+  batchMode = enabled;
+  batchSelection.clear();
+  if (batchMode) {
+    showElement(batchBar);
+  } else {
+    hideElement(batchBar);
+  }
+  renderGrid();
+}
+
+function toggleBatchSelection(id) {
+  if (batchSelection.has(id)) {
+    batchSelection.delete(id);
+  } else {
+    batchSelection.add(id);
+  }
+  updateBatchBar();
+  // re-render to update checkbox states
+  renderGrid();
+}
+
+function updateBatchBar() {
+  if (!batchMode) return;
+  batchCount.textContent = `${batchSelection.size} selected`;
+}
+
+async function batchFavorite() {
+  for (const id of batchSelection) {
+    const it = await getItemById(id);
+    if (it) {
+      it.favorite = true;
+      await updateItem(it);
+    }
+  }
+  await loadItems();
+}
+
+async function batchExport() {
+  const selectedItems = items.filter((it) => batchSelection.has(it.id));
+  if (!selectedItems.length) return;
+  const payload = await exportItemsSubset(selectedItems);
+  triggerDownloadJson("catalog-selected.json", payload);
+}
+
+async function batchShare() {
+  const selectedItems = items.filter((it) => batchSelection.has(it.id));
+  if (!selectedItems.length) return;
+  // share via QR multi-item code
+  await showQrForItems(selectedItems);
+}
+
+async function batchDelete() {
+  const ids = Array.from(batchSelection);
+  if (!ids.length) return;
+  if (!confirm(`Delete ${ids.length} items?`)) return;
+  await deleteMultiple(ids);
+  setBatchMode(false);
+}
+
+/* Favorites filter */
+
+function toggleFavoritesFilter() {
+  favoritesOnly = !favoritesOnly;
+  favoritesToggle.style.color = favoritesOnly ? "#facc15" : "";
+  applyFiltersAndRender();
+}
+
+/* Search + voice search */
+
+searchInput.addEventListener("input", () => applyFiltersAndRender());
+
+function startVoiceSearch() {
+  const SpeechRecognition =
+    window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    alert("Voice recognition not supported in this browser.");
+    return;
+  }
+  const rec = new SpeechRecognition();
+  rec.lang = "en-US";
+  rec.interimResults = false;
+  rec.maxAlternatives = 1;
+  rec.onresult = (e) => {
+    const transcript = e.results[0][0].transcript;
+    searchInput.value = transcript;
+    applyFiltersAndRender();
+  };
+  rec.start();
+}
+
+/* Navigation + animated pages */
+
+function setActivePage(name) {
+  pages.forEach((page) => {
+    if (page.dataset.page === name) {
+      page.classList.add("page-active");
+    } else {
+      page.classList.remove("page-active");
+    }
+  });
+
+  bottomNavButtons.forEach((btn) => {
+    const nav = btn.getAttribute("data-nav");
+    if (nav === name) {
+      btn.classList.add("bottom-nav-btn-active");
+    } else {
+      btn.classList.remove("bottom-nav-btn-active");
+    }
+  });
+}
+
+bottomNavButtons.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const nav = btn.getAttribute("data-nav");
+    setActivePage(nav);
+  });
+});
+
+logoButton.addEventListener("click", () => setActivePage("home"));
+settingsOpenBtn.addEventListener("click", () => setActivePage("settings"));
+
+/* Appearance settings */
+
+function loadAppearanceSettings() {
+  const storedTheme = localStorage.getItem("theme") || "dark";
+  const storedTextSize = localStorage.getItem("textSize") || "medium";
+  const storedLayout = localStorage.getItem("layout") || "grid-3";
+
+  themeSelect.value = storedTheme === "dark" ? "dark" : storedTheme;
+  textSizeSelect.value = storedTextSize;
+  layoutSelect.value = storedLayout;
+
+  applyTheme(storedTheme);
+  applyTextSize(storedTextSize);
+  applyLayout(storedLayout);
+}
+
+function applyTheme(theme) {
+  document.body.classList.remove("light-theme", "theme-blue", "theme-purple");
+  const metaTheme = document.getElementById("meta-theme-color");
+
+  if (theme === "light") {
+    document.body.classList.add("light-theme");
+    metaTheme.setAttribute("content", "#f9fafb");
+    darkModeToggle.checked = false;
+  } else if (theme === "blue") {
+    document.body.classList.add("theme-blue");
+    metaTheme.setAttribute("content", "#0f172a");
+    darkModeToggle.checked = true;
+  } else if (theme === "purple") {
+    document.body.classList.add("theme-purple");
+    metaTheme.setAttribute("content", "#0f172a");
+    darkModeToggle.checked = true;
+  } else {
+    metaTheme.setAttribute("content", "#020617");
+    darkModeToggle.checked = true;
+  }
+
+  localStorage.setItem("theme", theme);
 }
 
 function applyTextSize(size) {
-  const body = document.body;
-  body.classList.remove('text-size-small', 'text-size-medium', 'text-size-large');
-  body.classList.add(`text-size-${size}`);
-  localStorage.setItem(PREF_KEY_TEXT_SIZE, size);
+  document.body.classList.remove("text-small", "text-medium", "text-large");
+  document.body.classList.add(`text-${size}`);
+  localStorage.setItem("textSize", size);
 }
 
-function applyLayout(cols) {
-  const body = document.body;
-  body.classList.remove('layout-2cols', 'layout-3cols', 'layout-4cols');
-  body.classList.add(`layout-${cols}cols`);
-  localStorage.setItem(PREF_KEY_LAYOUT, cols);
+function applyLayout(layout) {
+  catalogGrid.classList.remove("grid-2-col", "grid-3-col", "grid-4-col");
+  if (layout === "grid-2") {
+    catalogGrid.classList.add("grid-2-col");
+  } else if (layout === "grid-4") {
+    catalogGrid.classList.add("grid-4-col");
+  } else {
+    catalogGrid.classList.add("grid-3-col");
+  }
+  localStorage.setItem("layout", layout);
 }
 
-// Backup info & reminders
-async function refreshBackupInfo() {
-  const info = await window.CatalogDB.getBackupInfo();
-  if (!info) {
-    lastBackupInfo.textContent = 'No backups yet.';
+/* Export / Import / Backup */
+
+exportAllBtn.addEventListener("click", async () => {
+  const payload = await exportAllToJson();
+  triggerDownloadJson("catalog-export.json", payload);
+});
+
+importBtn.addEventListener("click", () => {
+  importFileInput.value = "";
+  importFileInput.click();
+});
+
+importFileInput.addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const content = await file.text();
+  const result = await validateAndParseImport(content);
+
+  if (!result.ok) {
+    alert(`Import failed: ${result.error}`);
     return;
   }
-  const dt = new Date(info.lastBackupAt);
-  lastBackupInfo.textContent = `Last backup: ${dt.toLocaleString()}`;
-}
 
-async function performBackupNow() {
-  const data = await window.CatalogDB.exportAllItems();
-  downloadJson(data, `catalog-backup-${Date.now()}.json`);
-  await window.CatalogDB.setBackupInfo({
-    lastBackupAt: Date.now()
+  if (result.tampered) {
+    alert(
+      "Warning: The file appears to have been modified or corrupted. Proceed with caution."
+    );
+  }
+
+  const invalidItems = result.invalidItems || [];
+  let selectedMode = "merge";
+  const choice = prompt(
+    "Import mode: type 'merge', 'replace', or 'select' (default: merge)",
+    "merge"
+  );
+  if (choice === "replace") selectedMode = "replace";
+  else if (choice === "select") selectedMode = "select";
+
+  let selectedIds = null;
+  if (selectedMode === "select") {
+    const idsStr = prompt(
+      `Provide comma separated IDs to import.\nAvailable: ${result.items
+        .map((i) => i.id)
+        .join(", ")}`,
+      ""
+    );
+    if (idsStr && idsStr.trim()) {
+      selectedIds = idsStr.split(",").map((x) => x.trim());
+    }
+  }
+
+  let conflictResolvePromise = null;
+  let conflictResolveFn = null;
+
+  function openConflictDialog(existing, incoming) {
+    openModal(importConflictModal);
+    conflictNameSpan.textContent = existing.name;
+    conflictLocationSpan.textContent = existing.location;
+
+    conflictResolvePromise = new Promise((resolve) => {
+      conflictResolveFn = resolve;
+    });
+  }
+
+  conflictKeepExistingBtn.addEventListener("click", () => {
+    if (conflictResolveFn) conflictResolveFn("keep-existing");
+    closeModal(importConflictModal);
   });
-  await refreshBackupInfo();
-  showSnackbar('Backup exported');
-}
 
-async function checkBackupReminder() {
-  const days = parseInt(backupDaysInput.value || '1', 10);
-  localStorage.setItem(PREF_KEY_BACKUP_DAYS, String(days));
+  conflictKeepImportedBtn.addEventListener("click", () => {
+    if (conflictResolveFn) conflictResolveFn("keep-imported");
+    closeModal(importConflictModal);
+  });
 
-  const info = await window.CatalogDB.getBackupInfo();
-  if (!info || !info.lastBackupAt) {
-    showSnackbar('You have no backups yet. Consider exporting one.');
+  conflictSkipBtn.addEventListener("click", () => {
+    if (conflictResolveFn) conflictResolveFn("skip");
+    closeModal(importConflictModal);
+  });
+
+  const summary = await importItems({
+    items: result.items,
+    mode: selectedMode,
+    selectedIds,
+    conflictHandler: async (existing, incoming) => {
+      openConflictDialog(existing, incoming);
+      const decision = await conflictResolvePromise;
+      conflictResolvePromise = null;
+      conflictResolveFn = null;
+      return decision;
+    },
+  });
+
+  // Show import summary
+  importSummaryImportedSpan.textContent = summary.imported;
+  importSummarySkippedSpan.textContent = summary.skipped;
+  importSummaryReplacedSpan.textContent = summary.replaced;
+
+  if (invalidItems.length || result.tampered) {
+    importSummaryErrorsDiv.innerHTML = "";
+    if (result.tampered) {
+      const p = document.createElement("p");
+      p.textContent =
+        "File tampering detected: checksum mismatch. Some items may be unreliable.";
+      importSummaryErrorsDiv.appendChild(p);
+    }
+    if (invalidItems.length) {
+      const p = document.createElement("p");
+      p.textContent = `Items with invalid structure: ${invalidItems.length}`;
+      importSummaryErrorsDiv.appendChild(p);
+    }
+    showElement(importSummaryErrorsDiv);
+  } else {
+    hideElement(importSummaryErrorsDiv);
+  }
+
+  openModal(importSummaryModal);
+  await loadItems();
+});
+
+importSummaryCloseBtn.addEventListener("click", () =>
+  closeModal(importSummaryModal)
+);
+
+deleteAllBtn.addEventListener("click", async () => {
+  if (!confirm("Delete all data? This cannot be undone.")) return;
+  await clearAllItems();
+  await loadItems();
+});
+
+/* "Cloud" backup to Google Drive (manual export JSON) */
+
+backupDriveBtn.addEventListener("click", async () => {
+  const payload = await exportAllToJson();
+  triggerDownloadJson("catalog-backup-drive.json", payload);
+  const now = Date.now();
+  localStorage.setItem("lastBackupAt", String(now));
+});
+
+/* Auto-backup + reminder */
+
+function maybeAutoBackup() {
+  const lastBackupStr = localStorage.getItem("lastBackupAt");
+  const intervalDays = Number(
+    localStorage.getItem("backupIntervalDays") || "1"
+  );
+  const intervalMs = intervalDays * 24 * 60 * 60 * 1000;
+  const now = Date.now();
+  if (!lastBackupStr) {
+    // No backup yet: remind user
+    if (now - (Number(localStorage.getItem("firstUseAt")) || 0) > intervalMs) {
+      alert(
+        "You haven't backed up your catalog yet. Use Settings → Manual backup."
+      );
+    }
     return;
   }
-  const diffDays = (Date.now() - info.lastBackupAt) / (1000 * 60 * 60 * 24);
-  if (diffDays >= days) {
-    showSnackbar('Reminder: It is time to backup your catalog again.');
+
+  const lastBackup = Number(lastBackupStr);
+  if (now - lastBackup >= intervalMs) {
+    // Auto-export and store in browser downloads
+    exportAllToJson().then((payload) => {
+      triggerDownloadJson("catalog-auto-backup.json", payload);
+      localStorage.setItem("lastBackupAt", String(now));
+    });
   }
 }
 
-// Auto-backup scheduler (simple: run on load and once a day via setTimeout; real scheduling is limited in PWA)
-async function autoBackupScheduler() {
-  const days = parseInt(backupDaysInput.value || '1', 10);
-  const ms = days * 24 * 60 * 60 * 1000;
+function initBackupScheduler() {
+  const firstUseAt =
+    Number(localStorage.getItem("firstUseAt")) || Date.now();
+  localStorage.setItem("firstUseAt", String(firstUseAt));
 
-  const info = await window.CatalogDB.getBackupInfo();
-  const last = info?.lastBackupAt || 0;
-  const diff = Date.now() - last;
+  const intervalDays = Number(
+    localStorage.getItem("backupIntervalDays") || "1"
+  );
+  backupIntervalSelect.value = String(intervalDays);
 
-  if (diff >= ms && items.length > 0) {
-    // Auto backup
-    const data = await window.CatalogDB.exportAllItems();
-    // Save only oldest exports: for static offline app we just trigger download
-    downloadJson(data, `catalog-auto-backup-${Date.now()}.json`);
-    await window.CatalogDB.setBackupInfo({ lastBackupAt: Date.now() });
-    await refreshBackupInfo();
-  }
-
-  // schedule a simple next check (not persistent if app closed)
-  setTimeout(autoBackupScheduler, ms);
+  setInterval(maybeAutoBackup, 60 * 1000); // check every minute
+  maybeAutoBackup();
 }
 
-// Stats
+backupIntervalSelect.addEventListener("change", () => {
+  const days = Number(backupIntervalSelect.value);
+  localStorage.setItem("backupIntervalDays", String(days));
+});
+
+/* Stats */
+
 function updateStats() {
-  statTotalItems.textContent = String(items.length);
-  recentTimeline.innerHTML = '';
-  const recent = items
-    .slice()
-    .sort((a, b) => b.createdAt - a.createdAt)
-    .slice(0, 10);
+  const total = items.length;
+  const favs = items.filter((it) => it.favorite).length;
+  statTotalItems.textContent = total;
+  statFavorites.textContent = favs;
 
-  recent.forEach(item => {
-    const li = document.createElement('li');
-    const dt = new Date(item.createdAt).toLocaleString();
-    li.textContent = `${item.name} @ ${item.location} • ${dt}`;
-    recentTimeline.appendChild(li);
-  });
+  const sorted = [...items].sort(
+    (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+  );
+  const recent = sorted.slice(0, 10);
+  recentList.innerHTML = "";
+  for (const it of recent) {
+    const li = document.createElement("li");
+    const left = document.createElement("span");
+    left.textContent = it.name;
+    const right = document.createElement("span");
+    const date = new Date(it.createdAt);
+    right.textContent = date.toLocaleDateString();
+    li.appendChild(left);
+    li.appendChild(right);
+    recentList.appendChild(li);
+  }
 }
 
-// Page navigation
-navButtons.forEach(btn => {
-  btn.addEventListener('click', () => {
-    const target = btn.dataset.nav;
-    setActivePage(target);
-  });
-});
+/* QR code (simple, small payload) */
 
-// Home logo -> home page
-homeLogo.addEventListener('click', e => {
-  e.preventDefault();
-  setActivePage('home');
-});
+function drawSimpleQr(data) {
+  // Minimalistic "fake" QR style grid just for demo.
+  // For production you’d want a real QR implementation.
+  const ctx = qrCanvas.getContext("2d");
+  const size = qrCanvas.width;
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, size, size);
+  ctx.fillStyle = "#000";
 
-// FAB
-fabMain.addEventListener('click', () => {
-  fabMenu.classList.toggle('open');
-});
+  // simple hashing to distribute blocks
+  let hash = 0;
+  for (let i = 0; i < data.length; i++) {
+    hash = (hash * 31 + data.charCodeAt(i)) & 0xffffffff;
+  }
 
-fabMenu.addEventListener('click', e => {
-  const btn = e.target.closest('button');
-  if (!btn) return;
-  const action = btn.dataset.fabAction;
-  fabMenu.classList.remove('open');
+  const cols = 21;
+  const cell = size / cols;
 
-  if (action === 'add') {
-    handleAddItem();
-  } else if (action === 'import') {
-    handleImportStart();
-  } else if (action === 'export') {
-    handleExportAll();
-  } else if (action === 'deleteAll') {
-    if (confirm('Delete ALL items? This cannot be undone (except latest undo).')) {
-      const backup = items.slice();
-      window.CatalogDB.deleteAllItems().then(() => {
-        items = [];
-        applyFilters();
-        showSnackbar('All items deleted', true, async () => {
-          for (const it of backup) {
-            await window.CatalogDB.updateItem(it);
-          }
-          items = await window.CatalogDB.getAllItems();
-          applyFilters();
-        });
-      });
+  for (let y = 0; y < cols; y++) {
+    for (let x = 0; x < cols; x++) {
+      // primitive pattern
+      const val = (hash + x * 13 + y * 17) & 1;
+      if (val) {
+        ctx.fillRect(x * cell, y * cell, cell, cell);
+      }
     }
   }
+}
+
+async function showQrForItems(itemsToShare) {
+  const payload = await exportItemsSubset(itemsToShare);
+  const jsonStr = JSON.stringify(payload);
+  const encoded = btoa(jsonStr);
+  drawSimpleQr(encoded);
+  openModal(qrModal);
+}
+
+/* Share features */
+
+function shareViaWhatsApp(text) {
+  const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
+  window.open(url, "_blank");
+}
+
+function buildItemShareText(item) {
+  return `Catalog item:
+Name: ${item.name}
+Location: ${item.location}`;
+}
+
+function buildPreviewLink(item) {
+  const base = `${location.origin}${location.pathname}`;
+  const encoded = encodeURIComponent(
+    btoa(JSON.stringify({ id: item.id, name: item.name }))
+  );
+  return `${base}?item=${encoded}`;
+}
+
+/* Offline indicator */
+
+function updateOfflineIndicator() {
+  if (navigator.onLine) {
+    offlineIndicator.classList.remove("offline");
+  } else {
+    offlineIndicator.classList.add("offline");
+  }
+}
+
+/* PWA install + service worker */
+
+function registerServiceWorker() {
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("./service-worker.js").catch(() => {});
+  }
+}
+
+/* Event wiring */
+
+window.addEventListener("online", updateOfflineIndicator);
+window.addEventListener("offline", updateOfflineIndicator);
+
+fabAdd.addEventListener("click", openAddModal);
+itemModalClose.addEventListener("click", () => closeModal(itemModal));
+itemSaveBtn.addEventListener("click", () => {
+  saveItem().catch((err) => console.error(err));
 });
 
-// Filters
-searchInput.addEventListener('input', applyFilters);
-favoriteFilter.addEventListener('change', applyFilters);
-layoutSelect.addEventListener('change', () => {
-  applyLayout(layoutSelect.value);
+previewBackBtn.addEventListener("click", () => closePreview());
+previewFavoriteBtn.addEventListener("click", () => {
+  if (currentPreviewId) toggleFavorite(currentPreviewId);
 });
-textSizeSelect.addEventListener('change', () => {
-  applyTextSize(textSizeSelect.value);
+previewExportItemBtn.addEventListener("click", async () => {
+  if (!currentPreviewId) return;
+  const payload = await exportSingleItem(currentPreviewId);
+  triggerDownloadJson("catalog-item.json", payload);
 });
-
-// Theme toggle
-themeToggle.addEventListener('change', () => {
-  applyTheme(themeToggle.checked ? 'dark' : 'light');
+previewShareWhatsAppBtn.addEventListener("click", async () => {
+  if (!currentPreviewId) return;
+  const item = items.find((it) => it.id === currentPreviewId);
+  if (!item) return;
+  const text = buildItemShareText(item);
+  shareViaWhatsApp(text);
 });
-
-// Preview buttons
-previewCloseBtn.addEventListener('click', closePreview);
-previewFavoriteBtn.addEventListener('click', async () => {
-  if (currentPreviewIndex < 0) return;
-  const item = filteredItems[currentPreviewIndex];
-  const newFav = !item.favorite;
-  await window.CatalogDB.toggleFavorite(item.id, newFav);
-  item.favorite = newFav;
-  const idxReal = items.findIndex(i => i.id === item.id);
-  if (idxReal >= 0) items[idxReal].favorite = newFav;
-  previewFavoriteBtn.textContent = newFav ? 'Unfavorite' : 'Favorite';
-  applyFilters();
+previewShareLinkBtn.addEventListener("click", () => {
+  if (!currentPreviewId) return;
+  const item = items.find((it) => it.id === currentPreviewId);
+  if (!item) return;
+  const link = buildPreviewLink(item);
+  if (navigator.share) {
+    navigator.share({
+      title: "Catalog item",
+      url: link,
+    });
+  } else {
+    prompt("Copy link:", link);
+  }
 });
-previewDeleteBtn.addEventListener('click', async () => {
-  if (currentPreviewIndex < 0) return;
-  const item = filteredItems[currentPreviewIndex];
-  if (!confirm(`Delete "${item.name}"?`)) return;
-
-  const backupItem = { ...item };
-  await window.CatalogDB.deleteItem(item.id);
-  items = items.filter(i => i.id !== item.id);
-  applyFilters();
+previewShareQrBtn.addEventListener("click", async () => {
+  if (!currentPreviewId) return;
+  const item = items.find((it) => it.id === currentPreviewId);
+  await showQrForItems([item]);
+});
+previewDeleteBtn.addEventListener("click", () => {
+  if (!currentPreviewId) return;
+  deleteItemWithUndo(currentPreviewId);
   closePreview();
-  showSnackbar('Item deleted', true, async () => {
-    await window.CatalogDB.updateItem(backupItem);
-    items = await window.CatalogDB.getAllItems();
-    applyFilters();
-  });
+});
+previewFullscreenBtn.addEventListener("click", enterFullscreen);
+
+previewModal.addEventListener("touchstart", onPreviewTouchStart, {
+  passive: true,
+});
+previewModal.addEventListener("touchmove", onPreviewTouchMove, {
+  passive: true,
+});
+previewModal.addEventListener("touchend", onPreviewTouchEnd);
+
+/* pinch */
+previewImage.addEventListener("touchmove", handlePreviewTouchGesture, {
+  passive: false,
+});
+previewImage.addEventListener("touchend", handlePreviewTouchEndGesture, {
+  passive: false,
 });
 
-previewExportBtn.addEventListener('click', async () => {
-  if (currentPreviewIndex < 0) return;
-  const item = filteredItems[currentPreviewIndex];
-  const data = await window.CatalogDB.exportSingleItem(item.id);
-  if (!data) return;
-  downloadJson(data, `catalog-item-${item.id}.json`);
+favoritesToggle.addEventListener("click", toggleFavoritesFilter);
+batchToggle.addEventListener("click", () => setBatchMode(!batchMode));
+batchFavoriteBtn.addEventListener("click", () => batchFavorite());
+batchExportBtn.addEventListener("click", () => batchExport());
+batchShareBtn.addEventListener("click", () => batchShare());
+batchDeleteBtn.addEventListener("click", () => batchDelete());
+
+qrCloseBtn.addEventListener("click", () => closeModal(qrModal));
+
+voiceSearchBtn.addEventListener("click", startVoiceSearch);
+
+/* Appearance controls */
+
+themeSelect.addEventListener("change", () => {
+  const value = themeSelect.value;
+  applyTheme(value);
 });
 
-previewShareWhatsAppBtn.addEventListener('click', () => {
-  if (currentPreviewIndex < 0) return;
-  const item = filteredItems[currentPreviewIndex];
-  const text = `${item.name} @ ${item.location}`;
-  shareText(text);
-});
-
-previewShareLinkBtn.addEventListener('click', () => {
-  if (currentPreviewIndex < 0) return;
-  const item = filteredItems[currentPreviewIndex];
-  const data = btoa(JSON.stringify({ id: item.id, n: item.name, l: item.location }));
-  const link = `${location.origin}${location.pathname}?item=${encodeURIComponent(data)}`;
-  shareLink(link, item.name);
-});
-
-previewShareQRBtn.addEventListener('click', () => {
-  if (currentPreviewIndex < 0) return;
-  const item = filteredItems[currentPreviewIndex];
-  const data = JSON.stringify({ id: item.id, name: item.name, location: item.location });
-  generateFakeQR(data);
-  qrModal.classList.remove('hidden');
-});
-
-qrCloseBtn.addEventListener('click', () => {
-  qrModal.classList.add('hidden');
-});
-
-// Batch toolbar actions
-batchClearBtn.addEventListener('click', () => {
-  clearBatchSelection();
-});
-
-batchToolbar.addEventListener('click', e => {
-  const btn = e.target.closest('button[data-batch-action]');
-  if (!btn) return;
-  const action = btn.dataset.batchAction;
-  performBatchAction(action);
-});
-
-// Settings events
-exportAllBtn.addEventListener('click', handleExportAll);
-importBtn.addEventListener('click', handleImportStart);
-importFileInput.addEventListener('change', handleFileImport);
-
-backupNowBtn.addEventListener('click', () => {
-  performBackupNow();
-  checkBackupReminder();
-});
-
-backupDaysInput.addEventListener('change', () => {
-  localStorage.setItem(PREF_KEY_BACKUP_DAYS, backupDaysInput.value);
-});
-
-// Import mode modal buttons
-document.getElementById('importMergeBtn').addEventListener('click', () => {
-  runImport('merge', null);
-});
-document.getElementById('importReplaceBtn').addEventListener('click', () => {
-  if (confirm('Replace all existing items with imported ones?')) {
-    runImport('replace', null);
+darkModeToggle.addEventListener("change", () => {
+  const isDark = darkModeToggle.checked;
+  if (isDark) {
+    const theme = localStorage.getItem("theme") || "dark";
+    if (theme === "light") {
+      applyTheme("dark");
+      themeSelect.value = "dark";
+    } else {
+      applyTheme(theme);
+    }
+  } else {
+    applyTheme("light");
+    themeSelect.value = "light";
   }
 });
-document.getElementById('importSelectBtn').addEventListener('click', () => {
-  if (!pendingImportParsed || !Array.isArray(pendingImportParsed.items)) return;
-  openImportSelectDialog(pendingImportParsed.items);
-});
 
-// Import selection confirm/cancel
-importSelectConfirmBtn.addEventListener('click', () => {
-  if (!pendingImportParsed) return;
-  const ids = [];
-  importSelectList.querySelectorAll('.import-select-item').forEach(div => {
-    const checkbox = div.querySelector('input[type="checkbox"]');
-    if (checkbox && checkbox.checked) {
-      ids.push(div.dataset.id);
-    }
-  });
-  runImport('merge', ids);
-});
-importSelectCancelBtn.addEventListener('click', () => {
-  closeImportSelectDialog();
-});
+textSizeSelect.addEventListener("change", () =>
+  applyTextSize(textSizeSelect.value)
+);
+layoutSelect.addEventListener("change", () =>
+  applyLayout(layoutSelect.value)
+);
 
-// Voice search
-initVoiceSearch();
+/* Import summary close handled above */
 
-// Online/offline
-window.addEventListener('online', updateOfflineIndicator);
-window.addEventListener('offline', updateOfflineIndicator);
+/* Init */
 
-// Load preferences
-function loadPreferences() {
-  const theme = localStorage.getItem(PREF_KEY_THEME) || 'dark';
-  applyTheme(theme);
-
-  const size = localStorage.getItem(PREF_KEY_TEXT_SIZE) || 'medium';
-  textSizeSelect.value = size;
-  applyTextSize(size);
-
-  const cols = localStorage.getItem(PREF_KEY_LAYOUT) || '3';
-  layoutSelect.value = cols;
-  applyLayout(cols);
-
-  const backupDays = localStorage.getItem(PREF_KEY_BACKUP_DAYS) || '1';
-  backupDaysInput.value = backupDays;
-}
-
-// Init
 (async function init() {
+  loadAppearanceSettings();
   updateOfflineIndicator();
-  loadPreferences();
-  await loadItemsInitial();
-  await refreshBackupInfo();
-  await checkBackupReminder();
-  autoBackupScheduler();
+  registerServiceWorker();
+  initBackupScheduler();
+  await loadItems();
+
+  // If there is a ?item= link, try to open that preview
+  const urlParams = new URLSearchParams(window.location.search);
+  const encoded = urlParams.get("item");
+  if (encoded) {
+    try {
+      const decoded = JSON.parse(atob(decodeURIComponent(encoded)));
+      const it = items.find((i) => i.id === decoded.id);
+      if (it) openPreview(it.id);
+    } catch (err) {
+      console.warn("Invalid preview link");
+    }
+  }
 })();
