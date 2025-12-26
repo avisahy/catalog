@@ -1,0 +1,365 @@
+give me the full code with all the feature work . i want to copy the code and see how everything is working as excepted.
+e.g., real QR genarator , adjust animations, refine the import UX , all buttoms work , export card with picture 
+
+⭐ ULTIMATE PWA PROMPT (FULL FEATURE SET — RESPONSIVE, ALL PLATFORMS)
+Create a fully functional Progressive Web App (PWA) that runs entirely on GitHub Pages at:
+https://avisahy.github.io/catalog
+
+The app must use only static files supported by GitHub Pages:
+
+HTML
+
+CSS
+
+JavaScript
+
+JSON
+
+Images (PNG, JPG, SVG, WebP)
+
+Manifest file
+
+Service worker
+
+No backend, no frameworks, no build tools.
+
+The app should be fully responsive and work smoothly across all platforms (mobile, tablet, and desktop), with a mobile‑first design that scales gracefully up to large screens.
+
+🎯 App Purpose
+A simple, offline‑capable catalog where each item includes:
+
+Image
+
+Name
+
+Location
+
+🖼 UI & UX Requirements
+Modern 3D‑style interface using CSS transforms, depth, shadows, and card tilt
+
+Fully responsive layout that adapts to:
+
+Small phones
+
+Large phones
+
+Tablets
+
+Laptops
+
+Desktop / widescreen
+
+Mobile‑first design, but optimized for keyboard/mouse on desktop as well
+
+Floating Action Button (FAB) for adding items
+
+Smooth transitions and micro‑animations
+
+Toggle switch for Dark / Light mode (persistent)
+
+Clean, minimal, intuitive design
+
+Navigation
+The site icon/logo at the top must always link back to the home page.
+
+Animated Page Transitions (NEW)
+Smooth fade/slide transitions between:
+
+Home
+
+Preview
+
+Settings
+
+Stats
+
+Item Display
+In the main catalog view, each item shows only the picture.
+
+Tapping an item opens a full preview modal/page showing:
+
+Image
+
+Name
+
+Location
+
+Favorite toggle
+
+Export button
+
+Share via WhatsApp
+
+Share via QR code
+
+Share preview link
+
+Delete button
+
+Swipe Navigation
+Inside the item preview, the user can swipe left or right to move between items (on touch devices).
+
+On desktop, arrow buttons or keyboard arrows should allow navigation as well (responsive to input method).
+
+Swipe Exit Behavior
+When exiting preview:
+
+Automatically scroll back to the exact item viewed
+
+Briefly highlight it (glow/pulse)
+
+Image Interaction
+Pinch‑to‑Zoom inside preview (on touch devices)
+
+Double‑click or tap to toggle a full‑screen image mode
+
+Loading Experience
+Skeleton loading animation while items load
+
+Lazy loading images (load only when visible)
+
+Customization
+Text size control: small / medium / large
+
+Custom home screen layout: 2‑column, 3‑column, 4‑column
+
+Layout must adapt responsively to screen width (e.g., 2 columns on mobile, 4 on desktop)
+
+Custom themes: user‑selectable color themes
+
+📦 Data & Storage Requirements
+Use IndexedDB for structured offline storage.
+
+Export Requirements
+Export the entire database to a .json file.
+Export individual items to a .json file.
+
+Export file must include:
+
+Unique ID
+
+Name
+
+Location
+
+Image data or reference
+
+SHA‑256 checksum
+
+Import Requirements
+Import a .json file containing items.
+
+User must be able to choose:
+
+Merge all
+
+Replace all
+
+Select individual items to import
+
+Duplicate Prevention
+A duplicate is defined as an item with the same:
+
+name (case‑insensitive)
+
+location (case‑insensitive)
+
+AND identical SHA‑256 checksum
+
+Conflict Resolution Dialog
+If a duplicate is detected, show options:
+
+Keep existing
+
+Keep imported
+
+Skip
+
+Tamper Detection (NEW)
+If the imported JSON file was manually modified or corrupted:
+
+Warn the user
+
+Show which items failed validation
+
+Import Summary
+After import, show:
+
+Number imported
+
+Number skipped
+
+Number replaced
+
+Unique ID Rules
+Each item must use: crypto.randomUUID().
+
+🔍 Core Features
+Add new item (via FAB)
+
+Delete individual item
+
+Undo delete (snackbar)
+
+Delete all data (with confirmation)
+
+Search items by name or location
+
+Voice search using browser speech recognition
+
+Display items in a 3D card grid
+
+Swipe left/right in item preview
+
+Mark items as favorites
+
+Filter by favorites
+
+Export individual items
+
+Import all or selected items
+
+Share item via WhatsApp
+
+Share via QR code
+
+Multi‑Item QR Codes (NEW)
+Generate a QR code containing multiple items at once
+
+Share entire catalog (WhatsApp, email, QR)
+
+Share preview link (client‑side encoded URL)
+
+Cloud backup (manual export)
+Support manual export so the user can upload backups to Google Drive (user‑initiated).
+
+Offline indicator
+Show an offline indicator icon when the app is offline.
+
+Backup reminder
+Backup reminder every X days.
+
+PWA installability
+manifest.json
+
+service-worker.js
+
+Offline caching strategy
+
+🧺 Batch Actions (NEW)
+Select multiple items to:
+
+Delete
+
+Export
+
+Share
+
+Favorite
+
+📊 Statistics Page
+Include a stats page showing:
+
+Total items
+
+Recently added timeline
+
+🔄 Backup Automation
+Auto‑Backup Scheduler (NEW)
+Automatically export data every 1 day
+
+Keep only the oldest backups to avoid storage bloat
+
+Smart Reminders (NEW)
+If no backup was done for a while, notify the user
+
+📁 Technical Requirements
+Only HTML, CSS, and vanilla JavaScript
+
+All assets stored locally (no external CDNs)
+
+Must run without errors on GitHub Pages
+
+Fully responsive layout that works across mobile, tablet, and desktop
+
+Modular, readable code structure
+
+No dependencies, no bundlers, no frameworks
+
+Service worker must cache:
+
+HTML
+
+CSS
+
+JS
+
+Manifest
+
+Icons
+
+Images
+
+Offline fallback
+
+📜 Required Files
+index.html
+
+style.css
+
+script.js
+
+db.js (IndexedDB logic + import/export + duplicate detection + SHA‑256 + tamper detection)
+
+manifest.json
+
+service-worker.js
+
+/icons/ (PWA icons in multiple sizes)
+
+/images/ (user‑added images stored via file input)
+
+🎯 Output Expectations
+Deliver a complete, ready‑to‑deploy PWA that:
+
+Works offline
+
+Installs on mobile and desktop
+
+Is fully responsive and usable across phones, tablets, laptops, and desktops
+
+Syncs data via import/export
+
+Prevents duplicate imports using SHA‑256
+
+Detects tampered import files
+
+Allows exporting individual items
+
+Allows importing all or selected items
+
+Supports batch actions
+
+Supports WhatsApp, QR, and link sharing
+
+Supports multi‑item QR codes
+
+Supports swipe navigation
+
+Returns to the same item after exiting preview
+
+Supports pinch‑to‑zoom and full‑screen images
+
+Supports voice search
+
+Supports custom themes and layouts
+
+Shows skeleton loaders and offline indicator
+
+Provides stats and backup reminders
+
+Automatically backs up every 1 day
+
+Uses a 3D visual style
+
+Runs flawlessly on GitHub Pages
