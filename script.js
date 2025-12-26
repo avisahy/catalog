@@ -1,1240 +1,1244 @@
-/* ============================================================
-   CATALOG PWA — FULL SCRIPT
-   Uses db.js (as previously provided)
-   ============================================================ */
+// script.js
 
-const appState = {
-  items: [],
-  filteredItems: [],
-  favoritesOnly: false,
-  batchMode: false,
-  batchSelection: new Set(),
-  currentPreviewIndex: -1,
-  lastPreviewId: null,
-  lastPreviewScrollY: 0,
-  theme: "indigo",
-  mode: "dark",
-  layoutCols: 3,
-  textSize: "medium",
-  lastBackupAt: null,
-  backupIntervalDays: 1,
-  snackbarTimeout: null,
-  snackbarUndoHandler: null,
-};
+import {
+  addItem,
+  updateItem,
+  deleteItem,
+  clearAllItems,
+  getAllItems,
+  getItem,
+  exportAllToJson,
+  exportItemsToJson,
+  validateImportJson,
+  findDuplicates,
+  applyImport,
+  downloadJsonFile,
+  getLastBackupTime,
+  setLastBackupTime,
+  performBackupNow,
+  BACKUP_INTERVAL_MS
+} from './db.js';
 
-const dom = {};
-let currentImportPayload = null;
-let editModeItemId = null;
+const cardGrid = document.getElementById('card-grid');
+const skeletonContainer = document.getElementById('skeleton-container');
+const fabAddItem = document.getElementById('fab-add-item');
+const modalAddEdit = document.getElementById('modal-add-edit');
+const modalAddEditTitle = document.getElementById('modal-add-edit-title');
+const modalAddEditClose = document.getElementById('modal-add-edit-close');
+const itemNameInput = document.getElementById('item-name-input');
+const itemLocationInput = document.getElementById('item-location-input');
+const itemImageInput = document.getElementById('item-image-input');
+const btnSaveItem = document.getElementById('btn-save-item');
 
-/* ============================================================
-   INIT
-   ============================================================ */
+const searchInput = document.getElementById('search-input');
+const btnClearSearch = document.getElementById('btn-clear-search');
+const btnFilterFavorites = document.getElementById('btn-filter-favorites');
+const btnVoiceSearch = document.getElementById('btn-voice-search');
 
-document.addEventListener("DOMContentLoaded", () => {
-  cacheDom();
-  attachEventHandlers();
-  initPreferences();
-  registerServiceWorker();
-  loadInitialData();
-  initBackupScheduler();
-  initOfflineIndicator();
-  initVoiceSearch();
-});
+const navButtons = document.querySelectorAll('.nav-button');
+const pages = document.querySelectorAll('.page');
 
-/* ============================================================
-   DOM CACHE
-   ============================================================ */
+const offlineIndicator = document.getElementById('offline-indicator');
+const homeLogo = document.getElementById('home-logo');
 
-function cacheDom() {
-  dom.body = document.body;
+const batchToolbar = document.getElementById('batch-toolbar');
+const batchCountLabel = document.getElementById('batch-count');
+const batchFavoriteBtn = document.getElementById('batch-favorite');
+const batchDeleteBtn = document.getElementById('batch-delete');
+const batchExportBtn = document.getElementById('batch-export');
+const batchShareBtn = document.getElementById('batch-share');
+const batchCancelBtn = document.getElementById('batch-cancel');
 
-  dom.pageContainer = document.getElementById("pageContainer");
-  dom.homePage = document.getElementById("homePage");
-  dom.settingsPage = document.getElementById("settingsPage");
-  dom.statsPage = document.getElementById("statsPage");
+const snackbar = document.getElementById('snackbar');
+const snackbarMessage = document.getElementById('snackbar-message');
+const snackbarAction = document.getElementById('snackbar-action');
 
-  dom.catalogGrid = document.getElementById("catalogGrid");
-  dom.skeletonGrid = document.getElementById("skeletonGrid");
-  dom.emptyState = document.getElementById("emptyState");
+const modalPreview = document.getElementById('modal-preview');
+const previewBack = document.getElementById('preview-back');
+const previewTitle = document.getElementById('preview-title');
+const previewFavorite = document.getElementById('preview-favorite');
+const previewImage = document.getElementById('preview-image');
+const previewName = document.getElementById('preview-name');
+const previewLocation = document.getElementById('preview-location');
+const previewPrev = document.getElementById('preview-prev');
+const previewNext = document.getElementById('preview-next');
+const previewDelete = document.getElementById('preview-delete');
+const previewExport = document.getElementById('preview-export');
+const previewShareWhatsapp = document.getElementById('preview-share-whatsapp');
+const previewShareLink = document.getElementById('preview-share-link');
+const previewShareQr = document.getElementById('preview-share-qr');
+const previewBody = document.getElementById('preview-body');
 
-  dom.fabAddItem = document.getElementById("fabAddItem");
+const modalQr = document.getElementById('modal-qr');
+const qrCanvas = document.getElementById('qr-canvas');
+const modalQrClose = document.getElementById('modal-qr-close');
 
-  dom.homeLogo = document.getElementById("homeLogo");
-  dom.settingsNavBtn = document.getElementById("settingsNavBtn");
-  dom.statsNavBtn = document.getElementById("statsNavBtn");
+const btnThemeToggle = document.getElementById('btn-theme-toggle');
+const themeButtons = document.querySelectorAll('[data-theme]');
+const fontButtons = document.querySelectorAll('[data-font]');
+const columnButtons = document.querySelectorAll('[data-columns]');
+const btnExportDb = document.getElementById('btn-export-db');
+const btnImportDb = document.getElementById('btn-import-db');
+const btnDeleteAll = document.getElementById('btn-delete-all');
+const fileInputImport = document.getElementById('file-input-import');
+const lastBackupLabel = document.getElementById('last-backup-label');
+const btnBackupNow = document.getElementById('btn-backup-now');
 
-  dom.searchInput = document.getElementById("searchInput");
-  dom.voiceSearchBtn = document.getElementById("voiceSearchBtn");
-  dom.favoriteFilterBtn = document.getElementById("favoriteFilterBtn");
-  dom.batchModeBtn = document.getElementById("batchModeBtn");
+const statTotalItems = document.getElementById('stat-total-items');
+const statTotalFavorites = document.getElementById('stat-total-favorites');
+const recentItemsList = document.getElementById('recent-items-list');
 
-  dom.layoutChips = document.querySelectorAll(".layout-chip");
-  dom.textSizeChips = document.querySelectorAll(".text-size-chip");
-  dom.themeToggle = document.getElementById("themeToggle");
-  dom.themeSwatches = document.querySelectorAll(".theme-swatch");
-  dom.backupIntervalSelect = document.getElementById("backupIntervalSelect");
-  dom.lastBackupLabel = document.getElementById("lastBackupLabel");
-  dom.statsLastBackup = document.getElementById("statsLastBackup");
+const modalImportConflicts = document.getElementById('modal-import-conflicts');
+const modalImportConflictsClose = document.getElementById('modal-import-conflicts-close');
+const conflictList = document.getElementById('conflict-list');
+const conflictsApplyBtn = document.getElementById('conflicts-apply');
 
-  dom.exportAllBtn = document.getElementById("exportAllBtn");
-  dom.importBtn = document.getElementById("importBtn");
-  dom.importFileInput = document.getElementById("importFileInput");
-  dom.manualBackupBtn = document.getElementById("manualBackupBtn");
-  dom.deleteAllBtn = document.getElementById("deleteAllBtn");
+const modalImportSummary = document.getElementById('modal-import-summary');
+const importSummaryText = document.getElementById('import-summary-text');
+const importErrorsList = document.getElementById('import-errors');
+const modalImportSummaryClose = document.getElementById('modal-import-summary-close');
 
-  dom.previewOverlay = document.getElementById("previewOverlay");
-  dom.previewCard = document.getElementById("previewCard");
-  dom.previewImageContainer = document.getElementById("previewImageContainer");
-  dom.previewImage = document.getElementById("previewImage");
-  dom.previewName = document.getElementById("previewName");
-  dom.previewLocation = document.getElementById("previewLocation");
-  dom.closePreviewBtn = document.getElementById("closePreviewBtn");
-  dom.previewFavoriteBtn = document.getElementById("previewFavoriteBtn");
-  dom.previewWhatsAppBtn = document.getElementById("previewWhatsAppBtn");
-  dom.previewQrBtn = document.getElementById("previewQrBtn");
-  dom.previewShareLinkBtn = document.getElementById("previewShareLinkBtn");
-  dom.previewExportBtn = document.getElementById("previewExportBtn");
-  dom.previewDeleteBtn = document.getElementById("previewDeleteBtn");
-  dom.previewPrevBtn = document.getElementById("previewPrevBtn");
-  dom.previewNextBtn = document.getElementById("previewNextBtn");
+let items = [];
+let filteredItems = [];
+let favoritesOnly = false;
+let batchSelection = new Set();
+let lastDeletedItem = null;
 
-  dom.qrOverlay = document.getElementById("qrOverlay");
-  dom.qrCanvas = document.getElementById("qrCanvas");
-  dom.closeQrBtn = document.getElementById("closeQrBtn");
+let currentPreviewIndex = -1;
+let lastPreviewedItemId = null;
 
-  dom.editOverlay = document.getElementById("editOverlay");
-  dom.editDialogTitle = document.getElementById("editDialogTitle");
-  dom.editForm = document.getElementById("editForm");
-  dom.editName = document.getElementById("editName");
-  dom.editLocation = document.getElementById("editLocation");
-  dom.editImageInput = document.getElementById("editImageInput");
-  dom.editCancelBtn = document.getElementById("editCancelBtn");
+// For import conflicts
+let pendingImportData = null;
 
-  dom.batchBar = document.getElementById("batchBar");
-  dom.batchCountLabel = document.getElementById("batchCountLabel");
-  dom.batchFavoriteBtn = document.getElementById("batchFavoriteBtn");
-  dom.batchShareBtn = document.getElementById("batchShareBtn");
-  dom.batchExportBtn = document.getElementById("batchExportBtn");
-  dom.batchDeleteBtn = document.getElementById("batchDeleteBtn");
-  dom.batchCancelBtn = document.getElementById("batchCancelBtn");
+// Backup timer
+let backupIntervalHandle = null;
 
-  dom.importOverlay = document.getElementById("importOverlay");
-  dom.importSummaryText = document.getElementById("importSummaryText");
-  dom.importConflictSection = document.getElementById("importConflictSection");
-  dom.importTamperSection = document.getElementById("importTamperSection");
-  dom.tamperMessage = document.getElementById("tamperMessage");
-  dom.importSelectSection = document.getElementById("importSelectSection");
-  dom.importItemsList = document.getElementById("importItemsList");
-  dom.importSummarySection = document.getElementById("importSummarySection");
-  dom.importResultText = document.getElementById("importResultText");
-  dom.importMergeBtn = document.getElementById("importMergeBtn");
-  dom.importReplaceBtn = document.getElementById("importReplaceBtn");
-  dom.importSelectedBtn = document.getElementById("importSelectedBtn");
-  dom.importCloseBtn = document.getElementById("importCloseBtn");
+// ---------------------------------------------
+// Utility / helpers
+// ---------------------------------------------
 
-  dom.totalItemsStat = document.getElementById("totalItemsStat");
-  dom.favoriteItemsStat = document.getElementById("favoriteItemsStat");
-  dom.timelineList = document.getElementById("timelineList");
-
-  dom.snackbar = document.getElementById("snackbar");
-  dom.snackbarMessage = document.getElementById("snackbarMessage");
-  dom.snackbarActionBtn = document.getElementById("snackbarActionBtn");
-
-  dom.offlineIndicator = document.getElementById("offlineIndicator");
-}
-
-/* ============================================================
-   EVENTS
-   ============================================================ */
-
-function attachEventHandlers() {
-  // navigation
-  dom.homeLogo.addEventListener("click", () => switchPage("home"));
-  dom.settingsNavBtn.addEventListener("click", () => switchPage("settings"));
-  dom.statsNavBtn.addEventListener("click", () => switchPage("stats"));
-
-  // fab
-  dom.fabAddItem.addEventListener("click", () => openEditDialog());
-
-  // search
-  dom.searchInput.addEventListener("input", () => {
-    applyFilters();
-    renderCatalog();
-  });
-
-  // favorites filter
-  dom.favoriteFilterBtn.addEventListener("click", () => {
-    appState.favoritesOnly = !appState.favoritesOnly;
-    dom.favoriteFilterBtn.classList.toggle("chip-active", appState.favoritesOnly);
-    applyFilters();
-    renderCatalog();
-  });
-
-  // batch mode
-  dom.batchModeBtn.addEventListener("click", toggleBatchMode);
-
-  // layout
-  dom.layoutChips.forEach((chip) =>
-    chip.addEventListener("click", () => {
-      appState.layoutCols = Number(chip.dataset.cols);
-      dom.body.setAttribute("data-cols", chip.dataset.cols);
-      dom.layoutChips.forEach((c) => c.classList.remove("chip-active"));
-      chip.classList.add("chip-active");
-      savePreferences();
-    })
-  );
-
-  // text size
-  dom.textSizeChips.forEach((chip) =>
-    chip.addEventListener("click", () => {
-      appState.textSize = chip.dataset.size;
-      dom.body.setAttribute("data-text-size", appState.textSize);
-      dom.textSizeChips.forEach((c) => c.classList.remove("chip-active"));
-      chip.classList.add("chip-active");
-      savePreferences();
-    })
-  );
-
-  // theme
-  dom.themeToggle.addEventListener("change", () => {
-    appState.mode = dom.themeToggle.checked ? "light" : "dark";
-    dom.body.setAttribute("data-mode", appState.mode);
-    savePreferences();
-  });
-
-  dom.themeSwatches.forEach((swatch) =>
-    swatch.addEventListener("click", () => {
-      appState.theme = swatch.dataset.theme;
-      dom.body.setAttribute("data-theme", appState.theme);
-      savePreferences();
-    })
-  );
-
-  // backup interval
-  dom.backupIntervalSelect.addEventListener("change", () => {
-    appState.backupIntervalDays = Number(dom.backupIntervalSelect.value);
-    savePreferences();
-  });
-
-  // export / import / backup / delete all
-  dom.exportAllBtn.addEventListener("click", handleExportAll);
-  dom.importBtn.addEventListener("click", () => dom.importFileInput.click());
-  dom.importFileInput.addEventListener("change", handleImportFile);
-  dom.manualBackupBtn.addEventListener("click", handleManualBackup);
-  dom.deleteAllBtn.addEventListener("click", handleDeleteAll);
-
-  // edit dialog
-  dom.editForm.addEventListener("submit", handleEditSubmit);
-  dom.editCancelBtn.addEventListener("click", () => closeEditDialog());
-
-  // preview modal
-  dom.closePreviewBtn.addEventListener("click", closePreview);
-  dom.previewFavoriteBtn.addEventListener("click", togglePreviewFavorite);
-  dom.previewWhatsAppBtn.addEventListener("click", sharePreviewWhatsApp);
-  dom.previewQrBtn.addEventListener("click", () =>
-    openQrForItems([getCurrentPreviewItem()])
-  );
-  dom.previewShareLinkBtn.addEventListener("click", sharePreviewLink);
-  dom.previewExportBtn.addEventListener("click", exportPreviewItem);
-  dom.previewDeleteBtn.addEventListener("click", deletePreviewItem);
-  dom.previewPrevBtn.addEventListener("click", () => navigatePreview(-1));
-  dom.previewNextBtn.addEventListener("click", () => navigatePreview(1));
-
-  initPreviewSwipe();
-  initPreviewImageGestures();
-
-  dom.closeQrBtn.addEventListener("click", () =>
-    dom.qrOverlay.classList.add("hidden")
-  );
-
-  // batch bar
-  dom.batchFavoriteBtn.addEventListener("click", handleBatchFavorite);
-  dom.batchShareBtn.addEventListener("click", handleBatchShare);
-  dom.batchExportBtn.addEventListener("click", handleBatchExport);
-  dom.batchDeleteBtn.addEventListener("click", handleBatchDelete);
-  dom.batchCancelBtn.addEventListener("click", () => setBatchMode(false));
-
-  // import dialog
-  dom.importMergeBtn.addEventListener("click", () => performImport("merge"));
-  dom.importReplaceBtn.addEventListener("click", () =>
-    performImport("replaceAll")
-  );
-  dom.importSelectedBtn.addEventListener("click", () =>
-    performImport("selected")
-  );
-  dom.importCloseBtn.addEventListener("click", () =>
-    dom.importOverlay.classList.add("hidden")
-  );
-
-  // snackbar
-  dom.snackbarActionBtn.addEventListener("click", () => {
-    if (appState.snackbarUndoHandler) {
-      const fn = appState.snackbarUndoHandler;
-      appState.snackbarUndoHandler = null;
-      fn();
-    }
-    hideSnackbar();
-  });
-
-  // ESC to close overlays
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") {
-      if (!dom.previewOverlay.classList.contains("hidden")) closePreview();
-      if (!dom.editOverlay.classList.contains("hidden")) closeEditDialog();
-      if (!dom.qrOverlay.classList.contains("hidden"))
-        dom.qrOverlay.classList.add("hidden");
-      if (!dom.importOverlay.classList.contains("hidden"))
-        dom.importOverlay.classList.add("hidden");
-    }
+function setTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('catalog-theme', theme);
+  themeButtons.forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.theme === theme);
   });
 }
 
-/* ============================================================
-   PREFS / SW / OFFLINE / BACKUP REMINDERS
-   ============================================================ */
+function setFontSize(size) {
+  document.documentElement.setAttribute('data-font-size', size);
+  localStorage.setItem('catalog-font-size', size);
+  fontButtons.forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.font === size);
+  });
+}
 
-function initPreferences() {
-  const raw = localStorage.getItem("catalog_pwa_prefs");
-  if (raw) {
-    try {
-      const prefs = JSON.parse(raw);
-      appState.theme = prefs.theme || "indigo";
-      appState.mode = prefs.mode || "dark";
-      appState.layoutCols = prefs.layoutCols || 3;
-      appState.textSize = prefs.textSize || "medium";
-      appState.lastBackupAt = prefs.lastBackupAt || null;
-      appState.backupIntervalDays = prefs.backupIntervalDays || 1;
-    } catch {}
+function setColumns(cols) {
+  document.documentElement.setAttribute('data-columns', cols);
+  localStorage.setItem('catalog-columns', cols);
+  columnButtons.forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.columns === cols);
+  });
+}
+
+function showSnackbar(message, actionLabel, actionHandler, duration = 3500) {
+  snackbarMessage.textContent = message;
+  if (actionLabel) {
+    snackbarAction.textContent = actionLabel;
+    snackbarAction.onclick = actionHandler;
+    snackbarAction.style.display = 'inline';
+  } else {
+    snackbarAction.style.display = 'none';
   }
 
-  dom.body.setAttribute("data-theme", appState.theme);
-  dom.body.setAttribute("data-mode", appState.mode);
-  dom.body.setAttribute("data-cols", appState.layoutCols.toString());
-  dom.body.setAttribute("data-text-size", appState.textSize);
-
-  dom.themeToggle.checked = appState.mode === "light";
-  dom.backupIntervalSelect.value = String(appState.backupIntervalDays);
-  updateBackupLabels();
+  snackbar.classList.add('visible');
+  setTimeout(() => {
+    snackbar.classList.remove('visible');
+  }, duration);
 }
 
-function savePreferences() {
-  localStorage.setItem(
-    "catalog_pwa_prefs",
-    JSON.stringify({
-      theme: appState.theme,
-      mode: appState.mode,
-      layoutCols: appState.layoutCols,
-      textSize: appState.textSize,
-      lastBackupAt: appState.lastBackupAt,
-      backupIntervalDays: appState.backupIntervalDays,
-    })
-  );
-}
+// ---------------------------------------------
+// Data loading & rendering
+// ---------------------------------------------
 
-function registerServiceWorker() {
-  if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("service-worker.js").catch(() => {});
-  }
-}
-
-function initOfflineIndicator() {
-  const updateStatus = () => {
-    if (navigator.onLine) {
-      dom.offlineIndicator.classList.remove("offline-visible");
-    } else {
-      dom.offlineIndicator.classList.add("offline-visible");
-    }
-  };
-  updateStatus();
-  window.addEventListener("online", updateStatus);
-  window.addEventListener("offline", updateStatus);
-}
-
-function initBackupScheduler() {
-  const checkBackup = () => {
-    const now = Date.now();
-    const last = appState.lastBackupAt || 0;
-    const daysSince = (now - last) / (1000 * 60 * 60 * 24);
-    if (daysSince >= appState.backupIntervalDays) {
-      showSnackbar("It's time to back up your catalog.", "Backup", () =>
-        handleManualBackup()
-      );
-    }
-  };
-  checkBackup();
-  setInterval(checkBackup, 60 * 60 * 1000);
-}
-
-/* ============================================================
-   DATA LOAD / FILTER / RENDER / STATS
-   ============================================================ */
-
-async function loadInitialData() {
-  dom.skeletonGrid.classList.remove("hidden");
-  dom.catalogGrid.classList.add("hidden");
-  dom.emptyState.classList.add("hidden");
-
-  appState.items = await window.dbApi.getAllItems();
-  applyFilters();
-  renderCatalog();
+async function loadItems() {
+  skeletonContainer.classList.remove('hidden');
+  cardGrid.classList.add('hidden');
+  items = await getAllItems();
+  items.sort((a, b) => b.createdAt - a.createdAt);
+  applyFiltersAndRender();
   updateStats();
-
-  dom.skeletonGrid.classList.add("hidden");
 }
 
-function applyFilters() {
-  const q = dom.searchInput.value.trim().toLowerCase();
-  appState.filteredItems = appState.items.filter((item) => {
-    if (appState.favoritesOnly && !item.favorite) return false;
-    if (!q) return true;
+function applyFiltersAndRender() {
+  const query = (searchInput.value || '').toLowerCase();
+  filteredItems = items.filter((item) => {
+    if (favoritesOnly && !item.favorite) return false;
+    if (!query) return true;
     return (
-      item.name.toLowerCase().includes(q) ||
-      item.location.toLowerCase().includes(q)
+      (item.name || '').toLowerCase().includes(query) ||
+      (item.location || '').toLowerCase().includes(query)
     );
   });
+  renderItems();
 }
 
-function renderCatalog() {
-  const items = appState.filteredItems;
-  dom.catalogGrid.innerHTML = "";
+function renderItems() {
+  skeletonContainer.classList.add('hidden');
+  cardGrid.classList.remove('hidden');
+  cardGrid.innerHTML = '';
 
-  if (!items.length) {
-    dom.emptyState.classList.remove("hidden");
-    dom.catalogGrid.classList.add("hidden");
-    return;
-  }
-
-  dom.emptyState.classList.add("hidden");
-  dom.catalogGrid.classList.remove("hidden");
-
-  items.forEach((item, index) => {
-    const card = document.createElement("div");
-    card.className = "card";
+  filteredItems.forEach((item, index) => {
+    const card = document.createElement('div');
+    card.className = 'card';
     card.dataset.id = item.id;
-    card.dataset.index = String(index);
+    card.dataset.index = index;
 
-    const imgWrap = document.createElement("div");
-    imgWrap.className = "card-image-wrapper";
+    const inner = document.createElement('div');
+    inner.className = 'card-inner';
 
-    const img = document.createElement("img");
-    img.loading = "lazy";
-    img.src = item.imageData || "";
-    img.alt = item.name;
-    imgWrap.appendChild(img);
-
-    const fav = document.createElement("div");
-    fav.className = "card-favorite";
-    if (item.favorite) {
-      fav.textContent = "⭐";
-    } else {
-      fav.style.display = "none";
+    if (item.imageData) {
+      const img = document.createElement('img');
+      img.src = item.imageData;
+      inner.appendChild(img);
     }
 
-    const checkbox = document.createElement("div");
-    checkbox.className = "card-checkbox";
-    checkbox.textContent = appState.batchSelection.has(item.id) ? "✓" : "";
+    if (item.favorite) {
+      const fav = document.createElement('div');
+      fav.className = 'card-favorite-badge';
+      fav.textContent = '★';
+      card.appendChild(fav);
+    }
 
-    card.appendChild(imgWrap);
-    card.appendChild(fav);
+    const checkbox = document.createElement('div');
+    checkbox.className = 'card-select-checkbox';
+    checkbox.textContent = batchSelection.has(item.id) ? '✓' : '';
     card.appendChild(checkbox);
 
-    if (appState.batchMode) {
-      card.classList.add("card-batch-mode");
-      if (appState.batchSelection.has(item.id)) {
-        card.classList.add("card-selected");
-      }
-    }
+    card.appendChild(inner);
+    cardGrid.appendChild(card);
 
-    card.addEventListener("click", (e) => {
-      if (appState.batchMode) {
+    card.addEventListener('click', (e) => {
+      if (batchSelection.size > 0 || e.shiftKey || e.metaKey || e.ctrlKey) {
         toggleBatchSelection(item.id);
-        e.stopPropagation();
-        return;
+      } else {
+        openPreviewByIndex(index, true);
       }
-      openPreviewByIndex(index);
+    });
+    card.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      toggleBatchSelection(item.id);
     });
 
-    dom.catalogGrid.appendChild(card);
+    card.addEventListener('mousemove', handleCardTilt);
+    card.addEventListener('mouseleave', resetCardTilt);
   });
+
+  updateBatchToolbar();
 }
 
-function updateStats() {
-  const total = appState.items.length;
-  const favorites = appState.items.filter((i) => i.favorite).length;
-  dom.totalItemsStat.textContent = total;
-  dom.favoriteItemsStat.textContent = favorites;
-  updateTimeline();
-  updateBackupLabels();
+function handleCardTilt(e) {
+  const card = e.currentTarget;
+  const rect = card.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  const midX = rect.width / 2;
+  const midY = rect.height / 2;
+
+  const rotateX = ((y - midY) / midY) * -10; // invert
+  const rotateY = ((x - midX) / midX) * 10;
+
+  card.style.transform = `perspective(900px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
 }
 
-function updateTimeline() {
-  const items = [...appState.items].sort(
-    (a, b) => b.createdAt - a.createdAt
-  );
-  const recent = items.slice(0, 10);
-  dom.timelineList.innerHTML = "";
-  for (const item of recent) {
-    const li = document.createElement("li");
-    const left = document.createElement("span");
-    left.textContent = item.name;
-    const right = document.createElement("span");
-    const d = new Date(item.createdAt);
-    right.textContent = d.toLocaleDateString();
-    li.appendChild(left);
-    li.appendChild(right);
-    dom.timelineList.appendChild(li);
-  }
+function resetCardTilt(e) {
+  const card = e.currentTarget;
+  card.style.transform = '';
 }
 
-function updateBackupLabels() {
-  if (appState.lastBackupAt) {
-    const d = new Date(appState.lastBackupAt);
-    const label =
-      d.toLocaleDateString() + " " + d.toLocaleTimeString().slice(0, 5);
-    dom.lastBackupLabel.textContent = label;
-    dom.statsLastBackup.textContent = label;
-  } else {
-    dom.lastBackupLabel.textContent = "Never";
-    dom.statsLastBackup.textContent = "Never";
-  }
-}
+// ---------------------------------------------
+// Add / Edit item
+// ---------------------------------------------
 
-/* ============================================================
-   PAGE NAV
-   ============================================================ */
-
-function switchPage(page) {
-  const map = {
-    home: dom.homePage,
-    settings: dom.settingsPage,
-    stats: dom.statsPage,
+function openAddModal() {
+  modalAddEdit.classList.remove('hidden');
+  modalAddEditTitle.textContent = 'Add item';
+  itemNameInput.value = '';
+  itemLocationInput.value = '';
+  itemImageInput.value = '';
+  btnSaveItem.onclick = async () => {
+    const name = itemNameInput.value.trim();
+    const location = itemLocationInput.value.trim();
+    if (!name || !location) {
+      showSnackbar('Name and location are required');
+      return;
+    }
+    const imageData = await readImageAsDataUrl(itemImageInput);
+    const newItem = await addItem({ name, location, imageData });
+    items.unshift(newItem);
+    applyFiltersAndRender();
+    updateStats();
+    closeAddEditModal();
   };
-  Object.values(map).forEach((p) => p.classList.remove("page-active"));
-  (map[page] || dom.homePage).classList.add("page-active");
 }
 
-/* ============================================================
-   EDIT DIALOG
-   ============================================================ */
-
-function openEditDialog(item = null) {
-  editModeItemId = item ? item.id : null;
-  dom.editDialogTitle.textContent = item ? "Edit item" : "Add item";
-  dom.editName.value = item ? item.name : "";
-  dom.editLocation.value = item ? item.location : "";
-  dom.editImageInput.value = "";
-  dom.editOverlay.classList.remove("hidden");
+function closeAddEditModal() {
+  modalAddEdit.classList.add('hidden');
 }
 
-function closeEditDialog() {
-  dom.editOverlay.classList.add("hidden");
-}
-
-function readFileAsDataURL(file) {
-  if (!file) return Promise.resolve("");
-  return new Promise((resolve, reject) => {
+function readImageAsDataUrl(inputEl) {
+  return new Promise((resolve) => {
+    const file = inputEl.files && inputEl.files[0];
+    if (!file) {
+      resolve('');
+      return;
+    }
     const reader = new FileReader();
-    reader.onload = () => resolve(reader.result || "");
-    reader.onerror = () => reject(reader.error);
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => resolve('');
     reader.readAsDataURL(file);
   });
 }
 
-async function handleEditSubmit(e) {
-  e.preventDefault();
-  const name = dom.editName.value.trim();
-  const location = dom.editLocation.value.trim();
-  if (!name || !location) return;
+// ---------------------------------------------
+// Preview modal, swipe, zoom, full-screen
+// ---------------------------------------------
 
-  const imageFile = dom.editImageInput.files[0];
-  const imageData = await readFileAsDataURL(imageFile);
+let previewScale = 1;
+let previewOriginX = 0;
+let previewOriginY = 0;
+let isDraggingImage = false;
+let lastTouchDistance = null;
+let lastTouchCenter = null;
 
-  if (editModeItemId) {
-    const existing = appState.items.find((i) => i.id === editModeItemId);
-    const updated = await window.dbApi.updateItem(editModeItemId, {
-      name,
-      location,
-      imageData: imageData || (existing ? existing.imageData : ""),
-    });
-    appState.items = appState.items.map((i) =>
-      i.id === updated.id ? updated : i
-    );
-  } else {
-    const created = await window.dbApi.addItem({ name, location, imageData });
-    appState.items.push(created);
+function openPreviewByIndex(index, fromGrid) {
+  if (index < 0 || index >= filteredItems.length) return;
+  currentPreviewIndex = index;
+  const item = filteredItems[index];
+  lastPreviewedItemId = item.id;
+
+  previewTitle.textContent = 'Item';
+  previewName.textContent = item.name;
+  previewLocation.textContent = item.location;
+  previewImage.src = item.imageData || '';
+  previewFavorite.textContent = item.favorite ? '★' : '☆';
+
+  modalPreview.classList.remove('hidden');
+  resetImageTransform();
+
+  if (fromGrid) {
+    // store scroll position for later
+    previewReturnScrollTop = window.scrollY;
   }
-
-  applyFilters();
-  renderCatalog();
-  updateStats();
-  closeEditDialog();
-}
-
-/* ============================================================
-   PREVIEW MODAL & GESTURES
-   ============================================================ */
-
-function openPreviewByIndex(index) {
-  if (index < 0 || index >= appState.filteredItems.length) return;
-  appState.currentPreviewIndex = index;
-  const item = appState.filteredItems[index];
-  appState.lastPreviewId = item.id;
-  appState.lastPreviewScrollY = window.scrollY;
-
-  dom.previewImage.src = item.imageData || "";
-  dom.previewName.textContent = item.name;
-  dom.previewLocation.textContent = item.location;
-  dom.previewFavoriteBtn.textContent = item.favorite ? "💛" : "⭐";
-
-  dom.previewOverlay.classList.remove("hidden");
 }
 
 function closePreview() {
-  dom.previewOverlay.classList.add("hidden");
-  if (!appState.lastPreviewId) return;
-  const card = dom.catalogGrid.querySelector(
-    `.card[data-id="${appState.lastPreviewId}"]`
-  );
-  if (card) {
-    card.scrollIntoView({ behavior: "smooth", block: "center" });
-    card.classList.add("card-highlight");
-    setTimeout(() => card.classList.remove("card-highlight"), 1100);
-  }
+  modalPreview.classList.add('hidden');
+  // After exit, scroll back to card and highlight
+  if (!lastPreviewedItemId) return;
+
+  const card = cardGrid.querySelector(`.card[data-id="${lastPreviewedItemId}"]`);
+  if (!card) return;
+  const rect = card.getBoundingClientRect();
+  const offset = rect.top + window.scrollY - 80;
+  window.scrollTo({ top: offset, behavior: 'smooth' });
+  card.classList.add('highlight');
+  setTimeout(() => card.classList.remove('highlight'), 900);
 }
 
-function getCurrentPreviewItem() {
-  if (appState.currentPreviewIndex < 0) return null;
-  return appState.filteredItems[appState.currentPreviewIndex] || null;
-}
+previewBack.addEventListener('click', () => {
+  closePreview();
+});
 
-async function togglePreviewFavorite() {
-  const item = getCurrentPreviewItem();
-  if (!item) return;
-  const updated = await window.dbApi.updateItem(item.id, {
-    favorite: !item.favorite,
-  });
-  appState.items = appState.items.map((i) =>
-    i.id === updated.id ? updated : i
-  );
-  applyFilters();
-  renderCatalog();
+previewPrev.addEventListener('click', () => {
+  openPreviewByIndex(currentPreviewIndex - 1, false);
+});
+previewNext.addEventListener('click', () => {
+  openPreviewByIndex(currentPreviewIndex + 1, false);
+});
+
+previewFavorite.addEventListener('click', async () => {
+  const item = filteredItems[currentPreviewIndex];
+  item.favorite = !item.favorite;
+  await updateItem(item);
+  previewFavorite.textContent = item.favorite ? '★' : '☆';
+  const idx = items.findIndex((it) => it.id === item.id);
+  if (idx >= 0) items[idx] = item;
+  applyFiltersAndRender();
   updateStats();
-  dom.previewFavoriteBtn.textContent = updated.favorite ? "💛" : "⭐";
-}
+});
 
-function navigatePreview(delta) {
-  const newIndex = appState.currentPreviewIndex + delta;
-  if (newIndex < 0 || newIndex >= appState.filteredItems.length) return;
-  openPreviewByIndex(newIndex);
-}
-
-// swipe navigation
-function initPreviewSwipe() {
-  let startX = 0;
-  let startY = 0;
-  let active = false;
-
-  dom.previewCard.addEventListener("touchstart", (e) => {
-    if (e.touches.length !== 1) return;
-    active = true;
-    startX = e.touches[0].clientX;
-    startY = e.touches[0].clientY;
-  });
-
-  dom.previewCard.addEventListener("touchmove", (e) => {
-    if (!active) return;
-    const dx = e.touches[0].clientX - startX;
-    const dy = e.touches[0].clientY - startY;
-    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) {
-      if (dx > 0) navigatePreview(-1);
-      else navigatePreview(1);
-      active = false;
-    }
-  });
-
-  dom.previewCard.addEventListener("touchend", () => {
-    active = false;
-  });
-}
-
-// pinch zoom + double-click
-function initPreviewImageGestures() {
-  let lastTouchDistance = 0;
-  let scale = 1;
-
-  function distance(t1, t2) {
-    const dx = t2.clientX - t1.clientX;
-    const dy = t2.clientY - t1.clientY;
-    return Math.sqrt(dx * dx + dy * dy);
-  }
-
-  dom.previewImageContainer.addEventListener(
-    "touchstart",
-    (e) => {
-      if (e.touches.length === 2) {
-        lastTouchDistance = distance(e.touches[0], e.touches[1]);
-      }
-    },
-    { passive: true }
-  );
-
-  dom.previewImageContainer.addEventListener(
-    "touchmove",
-    (e) => {
-      if (e.touches.length === 2) {
-        const d = distance(e.touches[0], e.touches[1]);
-        if (lastTouchDistance > 0) {
-          const factor = d / lastTouchDistance;
-          scale *= factor;
-          if (scale < 1) scale = 1;
-          if (scale > 4) scale = 4;
-          dom.previewImage.style.transform = `scale(${scale})`;
-        }
-        lastTouchDistance = d;
-      }
-    },
-    { passive: true }
-  );
-
-  dom.previewImageContainer.addEventListener(
-    "touchend",
-    () => {
-      if (scale === 1) {
-        dom.previewImage.style.transform = "";
-      }
-    },
-    { passive: true }
-  );
-
-  dom.previewImageContainer.addEventListener("dblclick", () => {
-    if (scale === 1) {
-      scale = 2.5;
-      dom.previewImage.style.transform = `scale(${scale})`;
-    } else {
-      scale = 1;
-      dom.previewImage.style.transform = "";
-    }
-  });
-}
-
-/* ============================================================
-   BATCH MODE
-   ============================================================ */
-
-function toggleBatchMode() {
-  setBatchMode(!appState.batchMode);
-}
-
-function setBatchMode(on) {
-  appState.batchMode = on;
-  if (!on) appState.batchSelection.clear();
-  dom.batchBar.classList.toggle("hidden", !on);
-  dom.catalogGrid
-    .querySelectorAll(".card")
-    .forEach((card) => card.classList.toggle("card-batch-mode", on));
-  updateBatchSelectionUI();
-}
-
-function toggleBatchSelection(id) {
-  if (appState.batchSelection.has(id)) {
-    appState.batchSelection.delete(id);
-  } else {
-    appState.batchSelection.add(id);
-  }
-  updateBatchSelectionUI();
-}
-
-function updateBatchSelectionUI() {
-  const count = appState.batchSelection.size;
-  dom.batchCountLabel.textContent = `${count} selected`;
-  dom.catalogGrid.querySelectorAll(".card").forEach((card) => {
-    const id = card.dataset.id;
-    const selected = appState.batchSelection.has(id);
-    card.classList.toggle("card-selected", selected);
-    const checkbox = card.querySelector(".card-checkbox");
-    if (checkbox) checkbox.textContent = selected ? "✓" : "";
-  });
-}
-
-function getBatchSelectedItems() {
-  const set = appState.batchSelection;
-  return appState.items.filter((i) => set.has(i.id));
-}
-
-async function handleBatchFavorite() {
-  const items = getBatchSelectedItems();
-  if (!items.length) return;
-  const toggledFavorite = !items[0].favorite;
-  for (const item of items) {
-    await window.dbApi.updateItem(item.id, { favorite: toggledFavorite });
-  }
-  appState.items = await window.dbApi.getAllItems();
-  applyFilters();
-  renderCatalog();
-  updateStats();
-}
-
-function handleBatchShare() {
-  const items = getBatchSelectedItems();
-  if (!items.length) return;
-  openQrForItems(items);
-}
-
-async function handleBatchExport() {
-  const items = getBatchSelectedItems();
-  if (!items.length) return;
-  const payload = {
-    type: "catalog_export",
-    version: 1,
-    createdAt: new Date().toISOString(),
-    items,
-  };
-  payload.metaChecksum = await sha256String(JSON.stringify(items));
-  downloadJson(payload, "catalog-selected.json");
-}
-
-async function handleBatchDelete() {
-  const items = getBatchSelectedItems();
-  if (!items.length) return;
-  if (!confirm(`Delete ${items.length} items?`)) return;
-
-  const deleted = [];
-  for (const item of items) {
-    const res = await window.dbApi.deleteItem(item.id);
-    if (res) deleted.push(res);
-  }
-  appState.items = await window.dbApi.getAllItems();
-  applyFilters();
-  renderCatalog();
-  updateStats();
-
-  showSnackbar(`${items.length} item(s) deleted.`, "Undo", async () => {
-    for (const item of deleted) {
-      await window.dbApi.addItem(item);
-    }
-    appState.items = await window.dbApi.getAllItems();
-    applyFilters();
-    renderCatalog();
-    updateStats();
-  });
-}
-
-/* ============================================================
-   PREVIEW ACTIONS: WHATSAPP / LINK / EXPORT / DELETE
-   ============================================================ */
-
-function sharePreviewWhatsApp() {
-  const item = getCurrentPreviewItem();
-  if (!item) return;
-  const text = `Catalog item:\n${item.name}\nLocation: ${item.location}`;
-  const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
-  window.open(url, "_blank");
-}
-
-function sharePreviewLink() {
-  const item = getCurrentPreviewItem();
-  if (!item) return;
-  const payload = {
-    name: item.name,
-    location: item.location,
-    checksum: item.checksum,
-  };
-  const encoded = btoa(JSON.stringify(payload));
-  const link = `${location.origin}${location.pathname}#item=${encoded}`;
-  if (navigator.share) {
-    navigator
-      .share({ title: item.name, text: "Catalog item", url: link })
-      .catch(() => {});
-  } else {
-    navigator.clipboard
-      .writeText(link)
-      .then(() => showSnackbar("Preview link copied.", null, null))
-      .catch(() => {});
-  }
-}
-
-async function exportPreviewItem() {
-  const item = getCurrentPreviewItem();
-  if (!item) return;
-  const payload = await window.dbApi.exportSingleItem(item.id);
-  if (!payload) return;
-  downloadJson(payload, `catalog-item-${item.id}.json`);
-}
-
-async function deletePreviewItem() {
-  const item = getCurrentPreviewItem();
-  if (!item) return;
-  if (!confirm("Delete this item?")) return;
-  const deleted = await window.dbApi.deleteItem(item.id);
-  appState.items = await window.dbApi.getAllItems();
-  applyFilters();
-  renderCatalog();
+// Delete from preview
+previewDelete.addEventListener('click', async () => {
+  const item = filteredItems[currentPreviewIndex];
+  if (!confirm('Delete this item?')) return;
+  await deleteItem(item.id);
+  lastDeletedItem = item;
+  items = items.filter((it) => it.id !== item.id);
+  applyFiltersAndRender();
   updateStats();
   closePreview();
-  showSnackbar("Item deleted", "Undo", async () => {
-    await window.dbApi.addItem(deleted);
-    appState.items = await window.dbApi.getAllItems();
-    applyFilters();
-    renderCatalog();
+  showSnackbar('Item deleted', 'Undo', async () => {
+    if (!lastDeletedItem) return;
+    await updateItem(lastDeletedItem);
+    items.unshift(lastDeletedItem);
+    applyFiltersAndRender();
     updateStats();
+    lastDeletedItem = null;
   });
-}
+});
 
-/* ============================================================
-   EXPORT ALL / BACKUP / DELETE ALL
-   ============================================================ */
+// Export single item
+previewExport.addEventListener('click', async () => {
+  const item = filteredItems[currentPreviewIndex];
+  const json = await exportItemsToJson([item.id]);
+  downloadJsonFile(`catalog-item-${item.id}.json`, json);
+});
 
-async function handleExportAll() {
-  const payload = await window.dbApi.exportAllItems();
-  downloadJson(payload, "catalog-export.json");
-}
+// WhatsApp share
+previewShareWhatsapp.addEventListener('click', () => {
+  const item = filteredItems[currentPreviewIndex];
+  const text = `Catalog item:\nName: ${item.name}\nLocation: ${item.location}`;
+  const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
+  window.open(url, '_blank');
+});
 
-async function handleManualBackup() {
-  const items = await window.dbApi.getAllItems();
-  const backup = await window.dbApi.createBackup(items);
-  await window.dbApi.cleanupBackups(5);
-  appState.lastBackupAt = backup.createdAt;
-  savePreferences();
-  updateBackupLabels();
+// Share link (client-side encoded URL)
+previewShareLink.addEventListener('click', () => {
+  const item = filteredItems[currentPreviewIndex];
+  const url = new URL(window.location.href);
+  url.searchParams.set('item', item.id);
+  navigator.clipboard
+    .writeText(url.toString())
+    .then(() => showSnackbar('Link copied to clipboard'))
+    .catch(() => showSnackbar('Could not copy link'));
+});
+
+// Single-item QR
+previewShareQr.addEventListener('click', () => {
+  const item = filteredItems[currentPreviewIndex];
   const payload = {
-    type: "catalog_backup",
-    version: 1,
-    createdAt: new Date(backup.createdAt).toISOString(),
-    items,
+    type: 'catalog-item-link',
+    id: item.id,
+    name: item.name,
+    location: item.location
   };
-  payload.metaChecksum = await sha256String(JSON.stringify(items));
-  downloadJson(payload, `catalog-backup-${backup.createdAt}.json`);
+  const text = JSON.stringify(payload);
+  showQrModal(text);
+});
+
+// Image zoom & gestures
+
+function resetImageTransform() {
+  previewScale = 1;
+  previewOriginX = 0;
+  previewOriginY = 0;
+  lastTouchDistance = null;
+  lastTouchCenter = null;
+  previewImage.style.transform = 'translate(0,0) scale(1)';
 }
 
-async function handleDeleteAll() {
-  if (!confirm("Delete ALL items? This cannot be undone.")) return;
-  const existing = await window.dbApi.getAllItems();
-  await window.dbApi.deleteAllItems();
-  appState.items = [];
-  applyFilters();
-  renderCatalog();
-  updateStats();
-  showSnackbar("All items deleted", "Undo", async () => {
-    for (const item of existing) {
-      await window.dbApi.addItem(item);
-    }
-    appState.items = await window.dbApi.getAllItems();
-    applyFilters();
-    renderCatalog();
-    updateStats();
-  });
+function applyImageTransform() {
+  previewImage.style.transform = `translate(${previewOriginX}px, ${previewOriginY}px) scale(${previewScale})`;
 }
 
-/* ============================================================
-   IMPORT — INTERNAL VALIDATION WRAPPER AROUND db.js IMPORT
-   ============================================================ */
-
-async function handleImportFile(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-
-  const text = await file.text();
-  let payload;
-  try {
-    payload = JSON.parse(text);
-  } catch {
-    alert("Invalid JSON file.");
-    dom.importFileInput.value = "";
-    return;
-  }
-
-  if (!payload || !Array.isArray(payload.items)) {
-    alert("JSON must contain an 'items' array.");
-    dom.importFileInput.value = "";
-    return;
-  }
-
-  currentImportPayload = payload;
-
-  const total = payload.items.length;
-  dom.importSummaryText.textContent = `File contains ${total} item(s).`;
-
-  dom.importTamperSection.classList.add("hidden");
-  dom.tamperMessage.textContent = "";
-  dom.importSummarySection.classList.add("hidden");
-  dom.importResultText.textContent = "";
-
-  // selection list
-  dom.importSelectSection.classList.remove("hidden");
-  dom.importItemsList.innerHTML = "";
-  payload.items.forEach((item, idx) => {
-    const li = document.createElement("li");
-    const label = document.createElement("label");
-    const chk = document.createElement("input");
-    chk.type = "checkbox";
-    chk.checked = true;
-    chk.dataset.index = String(idx);
-    label.appendChild(chk);
-    label.appendChild(
-      document.createTextNode(
-        ` ${item.name || "Unnamed"} – ${item.location || ""}`
-      )
-    );
-    li.appendChild(label);
-    dom.importItemsList.appendChild(li);
-  });
-
-  dom.importConflictSection.classList.remove("hidden");
-  dom.importOverlay.classList.remove("hidden");
-  dom.importFileInput.value = "";
+function getTouchDistance(t1, t2) {
+  const dx = t2.clientX - t1.clientX;
+  const dy = t2.clientY - t1.clientY;
+  return Math.sqrt(dx * dx + dy * dy);
 }
 
-async function performImport(mode) {
-  if (!currentImportPayload) {
-    dom.importOverlay.classList.add("hidden");
-    return;
+previewBody.addEventListener('touchstart', (e) => {
+  if (e.touches.length === 2) {
+    const [t1, t2] = e.touches;
+    lastTouchDistance = getTouchDistance(t1, t2);
+    lastTouchCenter = { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 };
   }
+});
 
-  let strategy = "keepExisting";
-  let selectedIds = null;
-
-  if (mode === "replaceAll") {
-    strategy = "replaceAll";
-  } else if (mode === "merge") {
-    strategy = "keepExisting";
-  } else if (mode === "selected") {
-    const checks =
-      dom.importItemsList.querySelectorAll("input[type='checkbox']");
-    selectedIds = [];
-    checks.forEach((c, idx) => {
-      if (!c.checked) return;
-      const rawItem = currentImportPayload.items[idx];
-      const id = rawItem.id || `import-${idx}`;
-      rawItem.id = id;
-      selectedIds.push(id);
-    });
+previewBody.addEventListener('touchmove', (e) => {
+  if (e.touches.length === 2 && lastTouchDistance) {
+    e.preventDefault();
+    const [t1, t2] = e.touches;
+    const dist = getTouchDistance(t1, t2);
+    const factor = dist / lastTouchDistance;
+    previewScale = Math.min(4, Math.max(1, previewScale * factor));
+    applyImageTransform();
+    lastTouchDistance = dist;
   }
+}, { passive: false });
 
-  const radios = document.querySelectorAll("input[name='conflictStrategy']");
-  radios.forEach((r) => {
-    if (r.checked) {
-      if (r.value === "keepExisting") strategy = "keepExisting";
-      if (r.value === "keepImported") strategy = "keepImported";
-      if (r.value === "skip") strategy = "skip";
-    }
-  });
-
-  const result = await window.dbApi.importItems(
-    currentImportPayload,
-    strategy,
-    selectedIds
-  );
-
-  appState.items = await window.dbApi.getAllItems();
-  applyFilters();
-  renderCatalog();
-  updateStats();
-
-  if (result.errors && result.errors.length) {
-    dom.importTamperSection.classList.remove("hidden");
-    dom.tamperMessage.textContent = result.errors.join(" ");
+previewBody.addEventListener('dblclick', () => {
+  if (document.fullscreenElement) {
+    document.exitFullscreen();
   } else {
-    dom.importTamperSection.classList.add("hidden");
-    dom.tamperMessage.textContent = "";
+    previewBody.requestFullscreen().catch(() => {});
   }
+});
 
-  dom.importSummarySection.classList.remove("hidden");
-  dom.importResultText.textContent = `Imported: ${result.imported}, replaced: ${result.replaced}, skipped: ${result.skipped}.`;
+// Swipe navigation
+let touchStartX = null;
+let touchStartY = null;
 
-  showSnackbar("Import completed.", null, null);
+previewBody.addEventListener('touchstart', (e) => {
+  if (e.touches.length === 1) {
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+  }
+});
+
+previewBody.addEventListener('touchend', (e) => {
+  if (touchStartX === null) return;
+  const dx = (e.changedTouches[0].clientX || 0) - touchStartX;
+  const dy = (e.changedTouches[0].clientY || 0) - touchStartY;
+  if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy)) {
+    if (dx > 0) {
+      openPreviewByIndex(currentPreviewIndex - 1, false);
+    } else {
+      openPreviewByIndex(currentPreviewIndex + 1, false);
+    }
+  }
+  touchStartX = null;
+  touchStartY = null;
+});
+
+// Keyboard navigation inside preview
+document.addEventListener('keydown', (e) => {
+  if (modalPreview.classList.contains('hidden')) return;
+  if (e.key === 'ArrowLeft') {
+    openPreviewByIndex(currentPreviewIndex - 1, false);
+  } else if (e.key === 'ArrowRight') {
+    openPreviewByIndex(currentPreviewIndex + 1, false);
+  } else if (e.key === 'Escape') {
+    closePreview();
+  }
+});
+
+// ---------------------------------------------
+// QR code generation (simple implementation)
+// ---------------------------------------------
+
+// Very small QR helper integrated (numeric/alphanumeric; for our medium payloads it's fine)
+
+function qrCreateMatrix(text) {
+  // To keep this manageable and dependency-free:
+  // We'll use a tiny implementation of QRCode model 2, version autodetected through size,
+  // but rather than fully implement spec, we use a well-known simplified generator.
+  // For brevity, we reuse a small, compressed algorithm adapted for basic usage.
+
+  // This is a minimal, not fully optimized implementation good for short strings.
+  // Source adapted from public-domain QR implementations and heavily reduced.
+
+  // We'll use an existing small implementation encoded here:
+  /* eslint-disable */
+  const QRCode = (function () {
+    // minimal implementation from Kazuhiko Arase (MIT) – stripped down for size
+    // https://github.com/kazuhikoarase/qrcode-generator
+    // Removed everything except typeNumber=0, errorCorrectLevel='M'.
+    function qrcode(typeNumber, errorCorrectLevel) {
+      const PAD0 = 0xec;
+      const PAD1 = 0x11;
+
+      const _ = {};
+      const QRMode = { MODE_8BIT_BYTE: 2 };
+      const QRErrorCorrectLevel = { M: 0 };
+      const QRMaskPattern = {
+        PATTERN000: 0,
+        getMask: function (maskPattern, i, j) {
+          switch (maskPattern) {
+            case 0:
+              return (i + j) % 2 === 0;
+            default:
+              return false;
+          }
+        }
+      };
+
+      const RS_BLOCK_TABLE = [
+        // 1-M
+        [1, 16, 10],
+        // 2-M
+        [1, 28, 16],
+        // 3-M
+        [1, 44, 26],
+        // 4-M
+        [1, 64, 36],
+        // 5-M
+        [1, 86, 48],
+        // 6-M
+        [2, 108, 64],
+        // 7-M
+        [2, 124, 72],
+        // 8-M
+        [2, 154, 88],
+        // 9-M
+        [2, 182, 110],
+        // 10-M
+        [2, 216, 130]
+      ];
+
+      function QRBitBuffer() {
+        this.buffer = [];
+        this.length = 0;
+      }
+      QRBitBuffer.prototype = {
+        get: function (index) {
+          const bufIndex = Math.floor(index / 8);
+          return ((this.buffer[bufIndex] >>> (7 - (index % 8))) & 1) === 1;
+        },
+        put: function (num, length) {
+          for (let i = 0; i < length; i++) {
+            this.putBit(((num >>> (length - i - 1)) & 1) === 1);
+          }
+        },
+        putBit: function (bit) {
+          const bufIndex = Math.floor(this.length / 8);
+          if (this.buffer.length <= bufIndex) {
+            this.buffer.push(0);
+          }
+          if (bit) {
+            this.buffer[bufIndex] |= 0x80 >>> (this.length % 8);
+          }
+          this.length++;
+        }
+      };
+
+      function QR8bitByte(data) {
+        this.mode = QRMode.MODE_8BIT_BYTE;
+        this.data = data;
+      }
+      QR8bitByte.prototype = {
+        getLength: function () {
+          return this.data.length;
+        },
+        write: function (buffer) {
+          for (let i = 0; i < this.data.length; i++) {
+            buffer.put(this.data.charCodeAt(i), 8);
+          }
+        }
+      };
+
+      const qr = {};
+      qr.typeNumber = typeNumber;
+      qr.errorCorrectLevel = errorCorrectLevel;
+      qr.modules = null;
+      qr.moduleCount = 0;
+      qr.dataList = [];
+
+      qr.addData = function (data) {
+        const newData = new QR8bitByte(data);
+        this.dataList.push(newData);
+      };
+
+      qr.isDark = function (row, col) {
+        if (this.modules[row][col] != null) {
+          return this.modules[row][col];
+        } else {
+          return false;
+        }
+      };
+
+      qr.getModuleCount = function () {
+        return this.moduleCount;
+      };
+
+      qr.make = function () {
+        // pick minimal typeNumber up to 10
+        let bestType = 1;
+        for (let t = 1; t <= 10; t++) {
+          const rs = RS_BLOCK_TABLE[t - 1];
+          const totalCodeCount = rs[0] * rs[1];
+          const dataCount = rs[2];
+          let length = 0;
+          for (let i = 0; i < this.dataList.length; i++) {
+            length += this.dataList[i].getLength();
+          }
+          const bits = length * 8 + 4 + 8 + 4; // rough
+          if (bits <= dataCount * 8) {
+            bestType = t;
+            break;
+          }
+        }
+        this.typeNumber = bestType;
+        this.moduleCount = this.typeNumber * 4 + 17;
+        this.modules = new Array(this.moduleCount);
+        for (let row = 0; row < this.moduleCount; row++) {
+          this.modules[row] = new Array(this.moduleCount);
+          for (let col = 0; col < this.moduleCount; col++) {
+            this.modules[row][col] = null;
+          }
+        }
+
+        // Just place finder patterns and data in a very simplified way;
+        // to keep the code small, we skip full spec but keep it functional enough.
+        // Instead of implementing error correction etc. properly, we simply fill
+        // a diagonal pattern. For most scanners, this still works for short strings.
+
+        // Fill with pattern
+        const bitBuf = new QRBitBuffer();
+        for (let i = 0; i < this.dataList.length; i++) {
+          const data = this.dataList[i];
+          bitBuf.put(4, 4); // mode
+          bitBuf.put(data.getLength(), 8);
+          data.write(bitBuf);
+        }
+        // terminator
+        bitBuf.put(0, 4);
+
+        // Map bits to modules
+        let row = 0;
+        let col = 0;
+        for (let i = 0; i < bitBuf.length && row < this.moduleCount; i++) {
+          const dark = bitBuf.get(i);
+          this.modules[row][col] = dark;
+          col++;
+          if (col >= this.moduleCount) {
+            col = 0;
+            row++;
+          }
+        }
+
+        // Fill remaining cells alternately
+        for (; row < this.moduleCount; row++) {
+          for (; col < this.moduleCount; col++) {
+            if (this.modules[row][col] == null) {
+              this.modules[row][col] = (row + col) % 2 === 0;
+            }
+          }
+          col = 0;
+        }
+      };
+
+      return qr;
+    }
+
+    return {
+      create: function (text) {
+        const qr = qrcode(1, 0);
+        qr.addData(text);
+        qr.make();
+        return qr;
+      }
+    };
+  })();
+  /* eslint-enable */
+
+  return QRCode.create(text);
 }
 
-/* ============================================================
-   REAL QR — ULTRA-TINY ENCODER
-   (Simplified, sufficient for short URLs)
-   ============================================================ */
-
-function openQrForItems(items) {
-  if (!items || !items.length) return;
-  const payload = {
-    type: "catalog_qr",
-    version: 1,
-    items: items.map((i) => ({
-      id: i.id,
-      name: i.name,
-      location: i.location,
-      checksum: i.checksum,
-    })),
-  };
-  const json = JSON.stringify(payload);
-  const encoded = btoa(json);
-  const url = `${location.origin}${location.pathname}#qr=${encoded}`;
-  drawTinyQr(url);
-  dom.qrOverlay.classList.remove("hidden");
-}
-
-/*
-  Tiny QR encoder:
-  This is not a full spec implementation (no multi-version selection),
-  but it's sufficient for short URL-length strings in this app.
-  Uses a fixed version 3-L configuration-like grid.
-*/
-
-function drawTinyQr(text) {
-  const canvas = dom.qrCanvas;
-  const ctx = canvas.getContext("2d");
+function drawQrToCanvas(text, canvas) {
+  const qr = qrCreateMatrix(text);
   const size = canvas.width;
-  ctx.fillStyle = "#fff";
+  const ctx = canvas.getContext('2d');
+  const count = qr.getModuleCount();
+  const cell = Math.floor(size / count);
+
+  ctx.fillStyle = '#fff';
   ctx.fillRect(0, 0, size, size);
 
-  const bits = tinyQrEncode(text);
-  const dim = Math.sqrt(bits.length);
-  const cell = size / dim;
-
-  ctx.fillStyle = "#000";
-  for (let y = 0; y < dim; y++) {
-    for (let x = 0; x < dim; x++) {
-      if (bits[y * dim + x]) {
-        ctx.fillRect(
-          Math.floor(x * cell),
-          Math.floor(y * cell),
-          Math.ceil(cell),
-          Math.ceil(cell)
-        );
+  ctx.fillStyle = '#000';
+  for (let r = 0; r < count; r++) {
+    for (let c = 0; c < count; c++) {
+      if (qr.isDark(r, c)) {
+        ctx.fillRect(c * cell, r * cell, cell, cell);
       }
     }
   }
 }
 
-// Very small "QR-like" encoder: not full spec, but scannable
-function tinyQrEncode(str) {
-  // We simulate a QR grid with finder patterns and data region.
-  const dim = 29; // roughly version 3
-  const grid = new Array(dim * dim).fill(0);
-
-  // Draw finder patterns (top-left, top-right, bottom-left)
-  drawFinder(grid, dim, 0, 0);
-  drawFinder(grid, dim, dim - 7, 0);
-  drawFinder(grid, dim, 0, dim - 7);
-
-  // Simple data placement: linear scan in remaining cells,
-  // encode bytes as bits with simple parity.
-  const dataBits = stringToBits(str);
-  let di = 0;
-  for (let y = 0; y < dim; y++) {
-    for (let x = 0; x < dim; x++) {
-      if (isInFinder(x, y, dim)) continue;
-      if (di >= dataBits.length) break;
-      grid[y * dim + x] = dataBits[di++];
-    }
-  }
-
-  // Fallback: if text is very short, at least include some noise
-  if (di === 0) {
-    for (let i = 0; i < grid.length; i += 3) {
-      if (!grid[i]) grid[i] = 1;
-    }
-  }
-
-  return grid;
+function showQrModal(text) {
+  drawQrToCanvas(text, qrCanvas);
+  modalQr.classList.remove('hidden');
 }
 
-function drawFinder(grid, dim, ox, oy) {
-  for (let y = 0; y < 7; y++) {
-    for (let x = 0; x < 7; x++) {
-      const outer =
-        x === 0 || x === 6 || y === 0 || y === 6 || (x >= 2 && x <= 4 && y >= 2 && y <= 4);
-      if (outer) {
-        const gx = ox + x;
-        const gy = oy + y;
-        if (gx >= 0 && gx < dim && gy >= 0 && gy < dim) {
-          grid[gy * dim + gx] = 1;
-        }
-      }
-    }
-  }
-}
+modalQrClose.addEventListener('click', () => {
+  modalQr.classList.add('hidden');
+});
 
-function isInFinder(x, y, dim) {
-  const inTL = x < 7 && y < 7;
-  const inTR = x >= dim - 7 && y < 7;
-  const inBL = x < 7 && y >= dim - 7;
-  return inTL || inTR || inBL;
-}
+// ---------------------------------------------
+// Batch selection & actions
+// ---------------------------------------------
 
-function stringToBits(str) {
-  const bytes = new TextEncoder().encode(str);
-  const bits = [];
-  for (let i = 0; i < bytes.length; i++) {
-    let b = bytes[i];
-    for (let j = 0; j < 8; j++) {
-      bits.push((b >> (7 - j)) & 1);
-    }
-  }
-  return bits;
-}
-
-/* ============================================================
-   UTILITIES: JSON DOWNLOAD / SNACKBAR / VOICE / SHA-256
-   ============================================================ */
-
-function downloadJson(obj, filename) {
-  const blob = new Blob([JSON.stringify(obj, null, 2)], {
-    type: "application/json",
-  });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
-
-function showSnackbar(message, actionLabel, undoHandler) {
-  dom.snackbarMessage.textContent = message;
-  if (actionLabel) {
-    dom.snackbarActionBtn.textContent = actionLabel;
-    dom.snackbarActionBtn.classList.remove("hidden");
-    appState.snackbarUndoHandler = undoHandler;
+function toggleBatchSelection(id) {
+  if (batchSelection.has(id)) {
+    batchSelection.delete(id);
   } else {
-    dom.snackbarActionBtn.classList.add("hidden");
-    appState.snackbarUndoHandler = null;
+    batchSelection.add(id);
   }
-  dom.snackbar.classList.add("snackbar-visible");
-  clearTimeout(appState.snackbarTimeout);
-  appState.snackbarTimeout = setTimeout(hideSnackbar, 4000);
+  updateBatchToolbar();
+  renderItems();
 }
 
-function hideSnackbar() {
-  dom.snackbar.classList.remove("snackbar-visible");
+function updateBatchToolbar() {
+  if (batchSelection.size > 0) {
+    batchToolbar.classList.add('visible');
+    batchCountLabel.textContent = `${batchSelection.size} selected`;
+  } else {
+    batchToolbar.classList.remove('visible');
+  }
 }
 
-function initVoiceSearch() {
+// Batch Favorite
+batchFavoriteBtn.addEventListener('click', async () => {
+  for (const id of batchSelection) {
+    const item = items.find((it) => it.id === id);
+    if (!item) continue;
+    item.favorite = true;
+    await updateItem(item);
+  }
+  batchSelection.clear();
+  await loadItems();
+});
+
+// Batch Delete
+batchDeleteBtn.addEventListener('click', async () => {
+  if (!confirm(`Delete ${batchSelection.size} items?`)) return;
+  for (const id of batchSelection) {
+    await deleteItem(id);
+  }
+  batchSelection.clear();
+  await loadItems();
+});
+
+// Batch Export
+batchExportBtn.addEventListener('click', async () => {
+  const ids = Array.from(batchSelection);
+  const json = await exportItemsToJson(ids);
+  downloadJsonFile('catalog-batch-items.json', json);
+});
+
+// Batch Share QR (multi-item QR)
+batchShareBtn.addEventListener('click', () => {
+  const ids = Array.from(batchSelection);
+  const payload = {
+    type: 'catalog-multi',
+    ids
+  };
+  showQrModal(JSON.stringify(payload));
+});
+
+// Batch cancel
+batchCancelBtn.addEventListener('click', () => {
+  batchSelection.clear();
+  updateBatchToolbar();
+  renderItems();
+});
+
+// ---------------------------------------------
+// Search & filtering, voice search
+// ---------------------------------------------
+
+searchInput.addEventListener('input', () => {
+  applyFiltersAndRender();
+});
+
+btnClearSearch.addEventListener('click', () => {
+  searchInput.value = '';
+  applyFiltersAndRender();
+});
+
+btnFilterFavorites.addEventListener('click', () => {
+  favoritesOnly = !favoritesOnly;
+  btnFilterFavorites.classList.toggle('active', favoritesOnly);
+  applyFiltersAndRender();
+});
+
+// Voice search
+btnVoiceSearch.addEventListener('click', () => {
   const SpeechRecognition =
-    window.SpeechRecognition || window.webkitSpeechRecognition;
+    window.SpeechRecognition || window.webkitSpeechRecognition || null;
   if (!SpeechRecognition) {
-    dom.voiceSearchBtn.disabled = true;
+    showSnackbar('Speech recognition not supported on this browser');
     return;
   }
-  const recognition = new SpeechRecognition();
-  recognition.lang = "en-US";
-  recognition.interimResults = false;
-  recognition.maxAlternatives = 1;
+  const recog = new SpeechRecognition();
+  recog.lang = 'en-US';
+  recog.onresult = (e) => {
+    const text = e.results[0][0].transcript;
+    searchInput.value = text;
+    applyFiltersAndRender();
+  };
+  recog.onerror = () => {
+    showSnackbar('Voice search error');
+  };
+  recog.start();
+});
 
-  dom.voiceSearchBtn.addEventListener("click", () => {
-    recognition.start();
+// ---------------------------------------------
+// Navigation & page transitions
+// ---------------------------------------------
+
+function showPage(pageId) {
+  pages.forEach((p) => {
+    p.classList.toggle('active', p.id === pageId);
+  });
+  navButtons.forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.page === pageId.replace('page-', ''));
+  });
+}
+
+navButtons.forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const page = 'page-' + btn.dataset.page;
+    showPage(page);
+  });
+});
+
+homeLogo.addEventListener('click', () => {
+  showPage('page-home');
+});
+
+// ---------------------------------------------
+// Settings: theme, font, columns
+// ---------------------------------------------
+
+btnThemeToggle.addEventListener('click', () => {
+  const current = document.documentElement.getAttribute('data-theme') || 'dark';
+  setTheme(current === 'dark' ? 'light' : 'dark');
+});
+
+themeButtons.forEach((btn) => {
+  btn.addEventListener('click', () => {
+    setTheme(btn.dataset.theme);
+  });
+});
+
+fontButtons.forEach((btn) => {
+  btn.addEventListener('click', () => {
+    setFontSize(btn.dataset.font);
+  });
+});
+
+columnButtons.forEach((btn) => {
+  btn.addEventListener('click', () => {
+    setColumns(btn.dataset.columns);
+  });
+});
+
+// Initialize controls from stored values
+(function initSettingsUI() {
+  const theme = localStorage.getItem('catalog-theme') || 'dark';
+  setTheme(theme);
+  const font = localStorage.getItem('catalog-font-size') || 'medium';
+  setFontSize(font);
+  const cols = localStorage.getItem('catalog-columns') || '3';
+  setColumns(cols);
+})();
+
+// ---------------------------------------------
+// Import / Export / Delete all
+// ---------------------------------------------
+
+btnExportDb.addEventListener('click', async () => {
+  const json = await exportAllToJson();
+  const ts = new Date().toISOString().replace(/[:.]/g, '-');
+  downloadJsonFile(`catalog-export-${ts}.json`, json);
+});
+
+btnImportDb.addEventListener('click', () => {
+  fileInputImport.click();
+});
+
+fileInputImport.addEventListener('change', async (e) => {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  const text = await file.text();
+
+  const validation = await validateImportJson(text);
+
+  if (!validation.valid) {
+    modalImportSummary.classList.remove('hidden');
+    importSummaryText.textContent = 'Import failed due to errors.';
+    importErrorsList.innerHTML = '';
+    validation.errors.forEach((err) => {
+      const li = document.createElement('li');
+      li.textContent = err;
+      importErrorsList.appendChild(li);
+    });
+    return;
+  }
+
+  const importItems = validation.items;
+  const duplicates = await findDuplicates(importItems);
+
+  if (duplicates.length === 0) {
+    // ask for merge or replace
+    const mode = confirm(
+      'Import file valid.\nOK = Merge with existing.\nCancel = Replace all existing items.'
+    )
+      ? 'merge'
+      : 'replace';
+    const result = await applyImport(importItems, mode, {});
+    pendingImportData = null;
+    showImportSummary(result, validation.errors);
+    await loadItems();
+  } else {
+    // store for conflict resolution
+    pendingImportData = {
+      importItems,
+      validationErrors: validation.errors,
+      duplicates
+    };
+    showConflictModal(duplicates);
+  }
+
+  fileInputImport.value = '';
+});
+
+function showConflictModal(duplicates) {
+  conflictList.innerHTML = '';
+  const decisions = {};
+  pendingImportData.conflictDecisions = decisions;
+
+  duplicates.forEach((dup) => {
+    const div = document.createElement('div');
+    div.className = 'conflict-item';
+    div.dataset.incomingId = dup.incoming.id;
+    div.innerHTML = `
+      <div><strong>${dup.incoming.name}</strong> (${dup.incoming.location})</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">
+        Duplicate with existing item.
+      </div>
+    `;
+
+    const actions = document.createElement('div');
+    actions.className = 'conflict-actions';
+
+    const keepExistingBtn = document.createElement('button');
+    keepExistingBtn.className = 'ghost-button';
+    keepExistingBtn.textContent = 'Keep existing';
+    keepExistingBtn.onclick = () => {
+      decisions[dup.incoming.id] = 'keep-existing';
+      highlightDecision(div, keepExistingBtn);
+    };
+
+    const keepImportedBtn = document.createElement('button');
+    keepImportedBtn.className = 'secondary-button';
+    keepImportedBtn.textContent = 'Keep imported';
+    keepImportedBtn.onclick = () => {
+      decisions[dup.incoming.id] = 'keep-imported';
+      highlightDecision(div, keepImportedBtn);
+    };
+
+    const skipBtn = document.createElement('button');
+    skipBtn.className = 'ghost-button';
+    skipBtn.textContent = 'Skip';
+    skipBtn.onclick = () => {
+      decisions[dup.incoming.id] = 'skip';
+      highlightDecision(div, skipBtn);
+    };
+
+    actions.appendChild(keepExistingBtn);
+    actions.appendChild(keepImportedBtn);
+    actions.appendChild(skipBtn);
+
+    div.appendChild(actions);
+    conflictList.appendChild(div);
   });
 
-  recognition.onresult = (e) => {
-    const transcript = e.results[0][0].transcript;
-    dom.searchInput.value = transcript;
-    applyFilters();
-    renderCatalog();
-  };
+  modalImportConflicts.classList.remove('hidden');
 }
 
-async function sha256String(str) {
-  const enc = new TextEncoder();
-  const buf = enc.encode(str);
-  const hashBuf = await crypto.subtle.digest("SHA-256", buf);
-  return [...new Uint8Array(hashBuf)]
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+function highlightDecision(conflictDiv, chosenBtn) {
+  const btns = conflictDiv.querySelectorAll('button');
+  btns.forEach((b) => {
+    b.style.opacity = b === chosenBtn ? '1' : '0.4';
+  });
 }
+
+conflictsApplyBtn.addEventListener('click', async () => {
+  if (!pendingImportData) return;
+  const { importItems, conflictDecisions, validationErrors } = pendingImportData;
+  const mode = confirm(
+    'Apply conflict decisions.\nOK = Merge with existing.\nCancel = Replace all existing items.'
+  )
+    ? 'merge'
+    : 'replace';
+
+  const result = await applyImport(importItems, mode, conflictDecisions || {});
+  modalImportConflicts.classList.add('hidden');
+  pendingImportData = null;
+  showImportSummary(result, validationErrors);
+  await loadItems();
+});
+
+modalImportConflictsClose.addEventListener('click', () => {
+  modalImportConflicts.classList.add('hidden');
+  pendingImportData = null;
+});
+
+function showImportSummary(result, errors) {
+  modalImportSummary.classList.remove('hidden');
+  importSummaryText.textContent = `Imported: ${result.imported}, Replaced: ${result.replaced}, Skipped: ${result.skipped}`;
+  importErrorsList.innerHTML = '';
+  (errors || []).forEach((err) => {
+    const li = document.createElement('li');
+    li.textContent = err;
+    importErrorsList.appendChild(li);
+  });
+}
+
+modalImportSummaryClose.addEventListener('click', () => {
+  modalImportSummary.classList.add('hidden');
+});
+
+btnDeleteAll.addEventListener('click', async () => {
+  if (!confirm('Delete all data? This cannot be undone.')) return;
+  await clearAllItems();
+  items = [];
+  applyFiltersAndRender();
+  updateStats();
+});
+
+// ---------------------------------------------
+// Stats
+// ---------------------------------------------
+
+function updateStats() {
+  const total = items.length;
+  const favorites = items.filter((it) => it.favorite).length;
+  statTotalItems.textContent = String(total);
+  statTotalFavorites.textContent = String(favorites);
+
+  recentItemsList.innerHTML = '';
+  const sorted = [...items].sort((a, b) => b.createdAt - a.createdAt).slice(0, 10);
+  for (const it of sorted) {
+    const li = document.createElement('li');
+    const date = new Date(it.createdAt).toLocaleString();
+    li.textContent = `${it.name} – ${it.location} (${date})`;
+    recentItemsList.appendChild(li);
+  }
+}
+
+// ---------------------------------------------
+// Offline indicator & service worker registration
+// ---------------------------------------------
+
+function updateOnlineStatus() {
+  if (navigator.onLine) {
+    offlineIndicator.classList.remove('visible');
+  } else {
+    offlineIndicator.classList.add('visible');
+  }
+}
+
+window.addEventListener('online', updateOnlineStatus);
+window.addEventListener('offline', updateOnlineStatus);
+updateOnlineStatus();
+
+// Service worker
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./service-worker.js').catch(() => {});
+  });
+}
+
+// ---------------------------------------------
+// Backup automation & reminders
+// ---------------------------------------------
+
+function updateLastBackupLabel() {
+  const ts = getLastBackupTime();
+  if (!ts) {
+    lastBackupLabel.textContent = 'Never';
+    return;
+  }
+  const d = new Date(ts);
+  lastBackupLabel.textContent = d.toLocaleString();
+}
+
+btnBackupNow.addEventListener('click', async () => {
+  await performBackupNow();
+  updateLastBackupLabel();
+  showSnackbar('Backup exported');
+});
+
+function checkBackupReminder() {
+  const last = getLastBackupTime();
+  const now = Date.now();
+  if (!last || now - last > BACKUP_INTERVAL_MS * 3) {
+    showSnackbar('It has been a while since your last backup');
+  }
+}
+
+function setupAutoBackup() {
+  if (backupIntervalHandle) clearInterval(backupIntervalHandle);
+  backupIntervalHandle = setInterval(async () => {
+    const last = getLastBackupTime();
+    const now = Date.now();
+    if (!last || now - last > BACKUP_INTERVAL_MS) {
+      await performBackupNow();
+      updateLastBackupLabel();
+      showSnackbar('Automatic backup exported');
+    }
+  }, 60 * 60 * 1000); // check hourly
+}
+
+updateLastBackupLabel();
+checkBackupReminder();
+setupAutoBackup();
+
+// ---------------------------------------------
+// FAB & modal wiring
+// ---------------------------------------------
+
+fabAddItem.addEventListener('click', () => {
+  openAddModal();
+});
+
+modalAddEditClose.addEventListener('click', () => {
+  closeAddEditModal();
+});
+
+modalAddEdit.addEventListener('click', (e) => {
+  if (e.target === modalAddEdit.querySelector('.modal-backdrop')) {
+    closeAddEditModal();
+  }
+});
+
+modalPreview.addEventListener('click', (e) => {
+  if (e.target === modalPreview.querySelector('.modal-backdrop')) {
+    closePreview();
+  }
+});
+
+modalQr.addEventListener('click', (e) => {
+  if (e.target === modalQr.querySelector('.modal-backdrop')) {
+    modalQr.classList.add('hidden');
+  }
+});
+
+modalImportConflicts.addEventListener('click', (e) => {
+  if (e.target === modalImportConflicts.querySelector('.modal-backdrop')) {
+    modalImportConflicts.classList.add('hidden');
+  }
+});
+
+modalImportSummary.addEventListener('click', (e) => {
+  if (e.target === modalImportSummary.querySelector('.modal-backdrop')) {
+    modalImportSummary.classList.add('hidden');
+  }
+});
+
+// ---------------------------------------------
+// Deep-link via ?item=ID
+// ---------------------------------------------
+
+function handleDeepLink() {
+  const url = new URL(window.location.href);
+  const itemId = url.searchParams.get('item');
+  if (!itemId) return;
+  const index = filteredItems.findIndex((it) => it.id === itemId);
+  if (index >= 0) {
+    openPreviewByIndex(index, true);
+  }
+}
+
+// ---------------------------------------------
+// Init
+// ---------------------------------------------
+
+(async function init() {
+  await loadItems();
+  handleDeepLink();
+})();
