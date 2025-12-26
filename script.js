@@ -107,6 +107,7 @@ let lastDeletedItem = null;
 let currentPreviewIndex = -1;
 let lastPreviewedItemId = null;
 
+let previewReturnScrollTop = 0;
 // For import conflicts
 let pendingImportData = null;
 
