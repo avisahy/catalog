@@ -1,383 +1,437 @@
 // db.js
-// IndexedDB logic, import/export, SHA-256, tamper detection, backups
 
 const DB_NAME = 'catalog-db';
 const DB_VERSION = 1;
 const STORE_ITEMS = 'items';
-const STORE_META = 'meta';
 
-let dbPromise = null;
+let dbInstance = null;
 
-function openDB() {
-  if (dbPromise) return dbPromise;
-  dbPromise = new Promise((resolve, reject) => {
+function openDb() {
+  return new Promise((resolve, reject) => {
+    if (dbInstance) {
+      resolve(dbInstance);
+      return;
+    }
     const request = indexedDB.open(DB_NAME, DB_VERSION);
 
     request.onupgradeneeded = (event) => {
       const db = event.target.result;
-
       if (!db.objectStoreNames.contains(STORE_ITEMS)) {
-        const itemStore = db.createObjectStore(STORE_ITEMS, { keyPath: 'id' });
-        itemStore.createIndex('by_favorite', 'favorite', { unique: false });
-        itemStore.createIndex('by_createdAt', 'createdAt', { unique: false });
-      }
-
-      if (!db.objectStoreNames.contains(STORE_META)) {
-        db.createObjectStore(STORE_META, { keyPath: 'key' });
+        const store = db.createObjectStore(STORE_ITEMS, { keyPath: 'id' });
+        store.createIndex('byName', 'name', { unique: false });
+        store.createIndex('byLocation', 'location', { unique: false });
+        store.createIndex('byFavorite', 'favorite', { unique: false });
       }
     };
 
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = (event) => {
+      dbInstance = event.target.result;
+      resolve(dbInstance);
+    };
+
     request.onerror = () => reject(request.error);
   });
-
-  return dbPromise;
 }
 
-// CRUD
+/**
+ * Compute SHA-256 of a string and return hex
+ */
+async function sha256(str) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(str);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hashHex = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+  return hashHex;
+}
 
-async function dbAddItem(item) {
-  const db = await openDB();
+/**
+ * Ensure item has checksum; if not, compute it from relevant fields
+ */
+async function ensureChecksum(item) {
+  if (item.checksum) return item.checksum;
+  const base = (item.name || '') + '|' + (item.location || '') + '|' + (item.imageData || '');
+  const checksum = await sha256(base);
+  item.checksum = checksum;
+  return checksum;
+}
+
+async function addItem({ name, location, imageData }) {
+  const db = await openDb();
+  const id = crypto.randomUUID();
+  const item = {
+    id,
+    name: name.trim(),
+    location: location.trim(),
+    imageData,
+    favorite: false,
+    createdAt: Date.now()
+  };
+  await ensureChecksum(item);
+
   return new Promise((resolve, reject) => {
-    const tx = db.transaction([STORE_ITEMS], 'readwrite');
+    const tx = db.transaction(STORE_ITEMS, 'readwrite');
     tx.objectStore(STORE_ITEMS).add(item);
     tx.oncomplete = () => resolve(item);
     tx.onerror = () => reject(tx.error);
   });
 }
 
-async function dbUpdateItem(item) {
-  const db = await openDB();
+async function updateItem(item) {
+  const db = await openDb();
+  await ensureChecksum(item);
   return new Promise((resolve, reject) => {
-    const tx = db.transaction([STORE_ITEMS], 'readwrite');
+    const tx = db.transaction(STORE_ITEMS, 'readwrite');
     tx.objectStore(STORE_ITEMS).put(item);
     tx.oncomplete = () => resolve(item);
     tx.onerror = () => reject(tx.error);
   });
 }
 
-async function dbDeleteItem(id) {
-  const db = await openDB();
+async function deleteItem(id) {
+  const db = await openDb();
   return new Promise((resolve, reject) => {
-    const tx = db.transaction([STORE_ITEMS], 'readwrite');
+    const tx = db.transaction(STORE_ITEMS, 'readwrite');
     tx.objectStore(STORE_ITEMS).delete(id);
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
 }
 
-async function dbGetItem(id) {
-  const db = await openDB();
+async function clearAllItems() {
+  const db = await openDb();
   return new Promise((resolve, reject) => {
-    const tx = db.transaction([STORE_ITEMS], 'readonly');
-    const req = tx.objectStore(STORE_ITEMS).get(id);
-    req.onsuccess = () => resolve(req.result || null);
-    req.onerror = () => reject(req.error);
+    const tx = db.transaction(STORE_ITEMS, 'readwrite');
+    tx.objectStore(STORE_ITEMS).clear();
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
   });
 }
 
-async function dbGetAllItems() {
-  const db = await openDB();
+async function getAllItems() {
+  const db = await openDb();
   return new Promise((resolve, reject) => {
-    const tx = db.transaction([STORE_ITEMS], 'readonly');
+    const tx = db.transaction(STORE_ITEMS, 'readonly');
     const req = tx.objectStore(STORE_ITEMS).getAll();
     req.onsuccess = () => resolve(req.result || []);
     req.onerror = () => reject(req.error);
   });
 }
 
-async function dbClearAll() {
-  const db = await openDB();
+async function getItem(id) {
+  const db = await openDb();
   return new Promise((resolve, reject) => {
-    const tx = db.transaction([STORE_ITEMS, STORE_META], 'readwrite');
-    tx.objectStore(STORE_ITEMS).clear();
-    tx.objectStore(STORE_META).clear();
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-}
-
-// Meta store helpers
-
-async function dbSetMeta(key, value) {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction([STORE_META], 'readwrite');
-    tx.objectStore(STORE_META).put({ key, value });
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-}
-
-async function dbGetMeta(key) {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction([STORE_META], 'readonly');
-    const req = tx.objectStore(STORE_META).get(key);
-    req.onsuccess = () => resolve(req.result ? req.result.value : null);
+    const tx = db.transaction(STORE_ITEMS, 'readonly');
+    const req = tx.objectStore(STORE_ITEMS).get(id);
+    req.onsuccess = () => resolve(req.result || null);
     req.onerror = () => reject(req.error);
   });
 }
 
-// SHA-256
+/**
+ * Export functions
+ */
 
-async function sha256(data) {
-  const enc = new TextEncoder();
-  const bytes = enc.encode(data);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', bytes);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
-}
+async function exportAllToJson() {
+  const items = await getAllItems();
+  // Ensure all checksums exist
+  for (const it of items) {
+    await ensureChecksum(it);
+  }
 
-// Item helpers
-
-async function createItem({ name, location, imageDataUrl }) {
-  const id = crypto.randomUUID();
-  const payloadForHash = JSON.stringify({ name: name.trim().toLowerCase(), location: location.trim().toLowerCase(), imageDataUrl });
-  const checksum = await sha256(payloadForHash);
-
-  const item = {
-    id,
-    name: name.trim(),
-    location: location.trim(),
-    imageDataUrl: imageDataUrl || null,
-    favorite: false,
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-    checksum,
-  };
-
-  await dbAddItem(item);
-  return item;
-}
-
-async function updateItem(id, changes) {
-  const existing = await dbGetItem(id);
-  if (!existing) throw new Error('Item not found');
-
-  const updated = { ...existing, ...changes, updatedAt: Date.now() };
-
-  const payloadForHash = JSON.stringify({
-    name: updated.name.trim().toLowerCase(),
-    location: updated.location.trim().toLowerCase(),
-    imageDataUrl: updated.imageDataUrl,
-  });
-  updated.checksum = await sha256(payloadForHash);
-
-  await dbUpdateItem(updated);
-  return updated;
-}
-
-// Export
-
-async function exportAllItems() {
-  const items = await dbGetAllItems();
-  const exportObj = {
+  const payload = {
+    type: 'catalog-export',
     version: 1,
     exportedAt: new Date().toISOString(),
-    items,
+    items
   };
-  const jsonStr = JSON.stringify(exportObj, null, 2);
-  const fileChecksum = await sha256(jsonStr);
-  return {
-    json: jsonStr,
-    checksum: fileChecksum,
+
+  const payloadStr = JSON.stringify(payload);
+  const masterChecksum = await sha256(payloadStr);
+
+  const wrapper = {
+    meta: {
+      type: 'catalog-export-wrapper',
+      version: 1,
+      checksum: masterChecksum
+    },
+    data: payload
   };
+
+  return JSON.stringify(wrapper, null, 2);
 }
 
-async function exportItems(items) {
-  const exportObj = {
+async function exportItemsToJson(ids) {
+  const all = await getAllItems();
+  const selected = all.filter((it) => ids.includes(it.id));
+  for (const it of selected) {
+    await ensureChecksum(it);
+  }
+
+  const payload = {
+    type: 'catalog-export',
     version: 1,
     exportedAt: new Date().toISOString(),
-    items,
+    items: selected
   };
-  const jsonStr = JSON.stringify(exportObj, null, 2);
-  const fileChecksum = await sha256(jsonStr);
-  return {
-    json: jsonStr,
-    checksum: fileChecksum,
+
+  const payloadStr = JSON.stringify(payload);
+  const masterChecksum = await sha256(payloadStr);
+
+  const wrapper = {
+    meta: {
+      type: 'catalog-export-wrapper',
+      version: 1,
+      checksum: masterChecksum
+    },
+    data: payload
   };
+
+  return JSON.stringify(wrapper, null, 2);
 }
 
-async function exportSingleItem(id) {
-  const item = await dbGetItem(id);
-  if (!item) throw new Error('Item not found');
-  const result = await exportItems([item]);
-  return result;
-}
+/**
+ * Import functions
+ *  - Tamper detection via wrapper.meta.checksum
+ *  - Duplicate detection via name/location/checksum
+ */
 
-// Import & validation
-
-function isDuplicateItem(existing, incoming) {
-  const sameName = (existing.name || '').trim().toLowerCase() === (incoming.name || '').trim().toLowerCase();
-  const sameLocation = (existing.location || '').trim().toLowerCase() === (incoming.location || '').trim().toLowerCase();
-  const sameChecksum = existing.checksum === incoming.checksum;
-  return sameName && sameLocation && sameChecksum;
-}
-
-async function validateImportJson(jsonStr) {
-  let parsed;
-  const fileChecksum = await sha256(jsonStr);
+async function validateImportJson(text) {
+  const errors = [];
+  let wrapper;
 
   try {
-    parsed = JSON.parse(jsonStr);
-  } catch (err) {
+    wrapper = JSON.parse(text);
+  } catch (e) {
     return {
       valid: false,
-      fileChecksum,
-      reason: 'Invalid JSON syntax',
-      items: [],
-      itemErrors: [],
+      tampered: true,
+      errors: ['Invalid JSON structure'],
+      items: []
     };
   }
 
-  const items = Array.isArray(parsed.items) ? parsed.items : [];
-  const itemErrors = [];
-
-  const validatedItems = [];
-  for (const raw of items) {
-    if (!raw.id || !raw.name || !raw.location || !raw.checksum) {
-      itemErrors.push({ id: raw.id || null, reason: 'Missing required fields' });
-      continue;
-    }
-
-    const payloadForHash = JSON.stringify({
-      name: (raw.name || '').trim().toLowerCase(),
-      location: (raw.location || '').trim().toLowerCase(),
-      imageDataUrl: raw.imageDataUrl || null,
-    });
-    const expectedChecksum = await sha256(payloadForHash);
-    if (expectedChecksum !== raw.checksum) {
-      itemErrors.push({ id: raw.id, reason: 'Checksum mismatch (tampered or corrupted)' });
-      continue;
-    }
-
-    validatedItems.push(raw);
+  if (!wrapper.meta || !wrapper.data) {
+    return {
+      valid: false,
+      tampered: true,
+      errors: ['Missing wrapper meta or data'],
+      items: []
+    };
   }
 
-  const valid = itemErrors.length === 0;
-
-  return {
-    valid,
-    fileChecksum,
-    items: validatedItems,
-    itemErrors,
-  };
-}
-
-async function importItems({ items, mode, selectionIds, conflictStrategy }) {
-  // conflictStrategy: 'keep-existing' | 'keep-imported' | 'skip' (applied for duplicates)
-  const existingItems = await dbGetAllItems();
-  const existingById = new Map(existingItems.map((i) => [i.id, i]));
-  const toImport = selectionIds ? items.filter((it) => selectionIds.includes(it.id)) : items;
-
-  let imported = 0;
-  let skipped = 0;
-  let replaced = 0;
-
-  const db = await openDB();
-  const tx = db.transaction([STORE_ITEMS], 'readwrite');
-  const store = tx.objectStore(STORE_ITEMS);
-
-  function addOrPut(item) {
-    return new Promise((resolve, reject) => {
-      const req = store.put(item);
-      req.onsuccess = () => resolve();
-      req.onerror = () => reject(req.error);
-    });
+  if (wrapper.meta.type !== 'catalog-export-wrapper') {
+    errors.push('Unexpected wrapper type');
   }
 
-  if (mode === 'replace') {
-    await new Promise((resolve, reject) => {
-      const clearTx = db.transaction([STORE_ITEMS], 'readwrite');
-      clearTx.objectStore(STORE_ITEMS).clear();
-      clearTx.oncomplete = resolve;
-      clearTx.onerror = () => reject(clearTx.error);
-    });
+  // Verify checksum
+  const dataStr = JSON.stringify(wrapper.data);
+  const computed = await sha256(dataStr);
+  if (computed !== wrapper.meta.checksum) {
+    errors.push('Checksum mismatch (possible tampering)');
   }
 
-  for (const item of toImport) {
-    const existing = existingItems.find((e) => isDuplicateItem(e, item));
-    if (existing) {
-      if (conflictStrategy === 'skip') {
-        skipped++;
-        continue;
-      } else if (conflictStrategy === 'keep-existing') {
-        skipped++;
-        continue;
-      } else if (conflictStrategy === 'keep-imported') {
-        await addOrPut(item);
-        replaced++;
-      }
-    } else {
-      await addOrPut(item);
-      imported++;
-    }
+  const data = wrapper.data;
+  if (!data.items || !Array.isArray(data.items)) {
+    errors.push('No items array found in data');
   }
 
-  await new Promise((resolve, reject) => {
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
+  const items = (data.items || []).map((raw) => {
+    return {
+      id: raw.id || crypto.randomUUID(),
+      name: raw.name || '',
+      location: raw.location || '',
+      imageData: raw.imageData || '',
+      favorite: !!raw.favorite,
+      createdAt: raw.createdAt || Date.now(),
+      checksum: raw.checksum || null
+    };
   });
 
+  // Validate each item’s checksum
+  const invalidItems = [];
+  for (const it of items) {
+    const base = (it.name || '') + '|' + (it.location || '') + '|' + (it.imageData || '');
+    const intendedChecksum = await sha256(base);
+    if (it.checksum && it.checksum !== intendedChecksum) {
+      invalidItems.push(it.id);
+    } else if (!it.checksum) {
+      it.checksum = intendedChecksum;
+    }
+  }
+
+  if (invalidItems.length > 0) {
+    errors.push(`Some items failed checksum validation: ${invalidItems.join(', ')}`);
+  }
+
   return {
-    imported,
-    skipped,
-    replaced,
+    valid: errors.length === 0,
+    tampered: errors.some((e) => e.toLowerCase().includes('checksum')),
+    errors,
+    items,
+    invalidItems
   };
 }
 
-// Backup meta
+/**
+ * Find duplicates compared to DB
+ */
+async function findDuplicates(importItems) {
+  const existing = await getAllItems();
+  const duplicates = [];
 
-async function recordBackup() {
-  const now = Date.now();
-  const stats = (await dbGetMeta('backupStats')) || { autoBackups: 0, manualBackups: 0 };
-  stats.manualBackups = (stats.manualBackups || 0) + 1;
-  await dbSetMeta('backupStats', stats);
-  await dbSetMeta('lastBackupAt', now);
+  for (const item of importItems) {
+    const name = (item.name || '').toLowerCase();
+    const loc = (item.location || '').toLowerCase();
+    const checksum = item.checksum;
+
+    const match = existing.find((e) => {
+      return (
+        (e.name || '').toLowerCase() === name &&
+        (e.location || '').toLowerCase() === loc &&
+        e.checksum === checksum
+      );
+    });
+
+    if (match) {
+      duplicates.push({
+        existing: match,
+        incoming: item
+      });
+    }
+  }
+
+  return duplicates;
 }
 
-async function recordAutoBackup() {
-  const now = Date.now();
-  const stats = (await dbGetMeta('backupStats')) || { autoBackups: 0, manualBackups: 0 };
-  stats.autoBackups = (stats.autoBackups || 0) + 1;
-  await dbSetMeta('backupStats', stats);
-  await dbSetMeta('lastBackupAt', now);
+/**
+ * Apply import results after conflict resolution
+ * strategies: "merge", "replace", or manual per conflict
+ */
+async function applyImport(importItems, mode, conflictDecisions) {
+  const db = await openDb();
+
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_ITEMS, 'readwrite');
+    const store = tx.objectStore(STORE_ITEMS);
+
+    const result = {
+      imported: 0,
+      skipped: 0,
+      replaced: 0
+    };
+
+    const process = async () => {
+      const existingItems = await getAllItems();
+      let toAdd = [...importItems];
+
+      if (mode === 'replace') {
+        await clearAllItems();
+        // fresh store
+      } else if (mode === 'merge') {
+        // Just merge, but respect duplicates by skipping
+      }
+
+      // Build map of duplicates for conflict resolution
+      const dupList = await findDuplicates(importItems);
+      const dupMap = new Map();
+      dupList.forEach((d) => {
+        dupMap.set(d.incoming.id, d);
+      });
+
+      for (const item of toAdd) {
+        const dup = dupMap.get(item.id);
+        if (!dup) {
+          store.put(item);
+          result.imported++;
+          continue;
+        }
+
+        // conflict decisions by incoming item id: "keep-existing" | "keep-imported" | "skip"
+        const decision = conflictDecisions[item.id];
+        if (decision === 'skip') {
+          result.skipped++;
+          continue;
+        } else if (decision === 'keep-existing') {
+          result.skipped++;
+          continue;
+        } else if (decision === 'keep-imported') {
+          store.put(item);
+          result.replaced++;
+          continue;
+        } else {
+          // default: keep existing
+          result.skipped++;
+          continue;
+        }
+      }
+    };
+
+    tx.oncomplete = () => resolve(result);
+    tx.onerror = () => reject(tx.error);
+
+    // Kick off
+    process().catch((err) => {
+      console.error(err);
+      tx.abort();
+      reject(err);
+    });
+  });
 }
 
-async function getBackupInfo() {
-  const lastBackupAt = await dbGetMeta('lastBackupAt');
-  const stats = (await dbGetMeta('backupStats')) || { autoBackups: 0, manualBackups: 0 };
-  return { lastBackupAt, stats };
+/**
+ * Simple helper for downloading a blob (used for backups, exports)
+ */
+function downloadJsonFile(filename, text) {
+  const blob = new Blob([text], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
-async function getStats() {
-  const items = await dbGetAllItems();
-  const total = items.length;
-  const favorites = items.filter((i) => i.favorite).length;
-  const recentSorted = [...items].sort((a, b) => b.createdAt - a.createdAt).slice(0, 10);
-  return { total, favorites, recent: recentSorted };
+/**
+ * Backup helpers
+ */
+
+const BACKUP_KEY_LAST = 'catalog-last-backup';
+const BACKUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
+function getLastBackupTime() {
+  const raw = localStorage.getItem(BACKUP_KEY_LAST);
+  return raw ? Number(raw) : null;
 }
 
-// Expose globals
+function setLastBackupTime(ts) {
+  localStorage.setItem(BACKUP_KEY_LAST, String(ts));
+}
 
-window.dbApi = {
-  createItem,
+async function performBackupNow() {
+  const json = await exportAllToJson();
+  const ts = new Date().toISOString().replace(/[:.]/g, '-');
+  downloadJsonFile(`catalog-backup-${ts}.json`, json);
+  setLastBackupTime(Date.now());
+}
+
+export {
+  addItem,
   updateItem,
-  deleteItem: dbDeleteItem,
-  getItem: dbGetItem,
-  getAllItems: dbGetAllItems,
-  clearAll: dbClearAll,
-  exportAllItems,
-  exportItems,
-  exportSingleItem,
+  deleteItem,
+  clearAllItems,
+  getAllItems,
+  getItem,
+  exportAllToJson,
+  exportItemsToJson,
   validateImportJson,
-  importItems,
-  recordBackup,
-  recordAutoBackup,
-  getBackupInfo,
-  getStats,
-  setMeta: dbSetMeta,
-  getMeta: dbGetMeta,
-  sha256,
+  findDuplicates,
+  applyImport,
+  downloadJsonFile,
+  getLastBackupTime,
+  setLastBackupTime,
+  performBackupNow,
+  BACKUP_INTERVAL_MS
 };
