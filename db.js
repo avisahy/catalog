@@ -1,368 +1,428 @@
 // db.js
-// IndexedDB logic, import/export, duplicate detection, SHA-256, tamper detection
 
-const DB_NAME = "catalog-db-v1";
+const DB_NAME = "catalog_db";
 const DB_VERSION = 1;
 const STORE_ITEMS = "items";
-const STORE_META = "meta";
+const STORE_BACKUPS = "backups";
 
-let dbPromise = null;
+// Open DB
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
 
-function openDb() {
-  if (dbPromise) return dbPromise;
-  dbPromise = new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = (e) => {
-      const db = e.target.result;
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result;
       if (!db.objectStoreNames.contains(STORE_ITEMS)) {
         const store = db.createObjectStore(STORE_ITEMS, { keyPath: "id" });
-        store.createIndex("by_name", "name", { unique: false });
-        store.createIndex("by_location", "location", { unique: false });
-        store.createIndex("by_favorite", "favorite", { unique: false });
+        store.createIndex("favorite", "favorite", { unique: false });
+        store.createIndex("createdAt", "createdAt", { unique: false });
+        store.createIndex("checksum", "checksum", { unique: false });
       }
-      if (!db.objectStoreNames.contains(STORE_META)) {
-        db.createObjectStore(STORE_META, { keyPath: "key" });
+      if (!db.objectStoreNames.contains(STORE_BACKUPS)) {
+        db.createObjectStore(STORE_BACKUPS, { keyPath: "createdAt" });
       }
     };
+
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+// SHA-256 helper
+async function sha256(str) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(str);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+// Convert image file to data URL
+function fileToDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+// Core item operations
+async function dbAddItem({ name, location, imageDataUrl }) {
+  const db = await openDB();
+  const id = crypto.randomUUID();
+  const payloadForChecksum = JSON.stringify({ name, location, imageDataUrl });
+  const checksum = await sha256(payloadForChecksum);
+  const now = Date.now();
+
+  const item = {
+    id,
+    name,
+    location,
+    imageDataUrl,
+    favorite: false,
+    createdAt: now,
+    updatedAt: now,
+    checksum,
+  };
+
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_ITEMS, "readwrite");
+    const store = tx.objectStore(STORE_ITEMS);
+    store.add(item);
+    tx.oncomplete = () => resolve(item);
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function dbUpdateItem(id, updates) {
+  const db = await openDB();
+  const tx = db.transaction(STORE_ITEMS, "readwrite");
+  const store = tx.objectStore(STORE_ITEMS);
+
+  const item = await new Promise((resolve, reject) => {
+    const req = store.get(id);
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
   });
-  return dbPromise;
-}
 
-/* Basic CRUD */
+  if (!item) return null;
 
-export async function addItem(item) {
-  const db = await openDb();
+  const updated = { ...item, ...updates, updatedAt: Date.now() };
   return new Promise((resolve, reject) => {
-    const tx = db.transaction([STORE_ITEMS], "readwrite");
-    tx.objectStore(STORE_ITEMS).add(item);
-    tx.oncomplete = () => resolve(item);
-    tx.onerror = () => reject(tx.error);
-  });
-}
-
-export async function updateItem(item) {
-  const db = await openDb();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction([STORE_ITEMS], "readwrite");
-    tx.objectStore(STORE_ITEMS).put(item);
-    tx.oncomplete = () => resolve(item);
-    tx.onerror = () => reject(tx.error);
-  });
-}
-
-export async function deleteItem(id) {
-  const db = await openDb();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction([STORE_ITEMS], "readwrite");
-    tx.objectStore(STORE_ITEMS).delete(id);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-}
-
-export async function clearAllItems() {
-  const db = await openDb();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction([STORE_ITEMS], "readwrite");
-    tx.objectStore(STORE_ITEMS).clear();
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-}
-
-export async function getAllItems() {
-  const db = await openDb();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction([STORE_ITEMS], "readonly");
-    const req = tx.objectStore(STORE_ITEMS).getAll();
-    req.onsuccess = () => resolve(req.result || []);
+    const req = store.put(updated);
+    req.onsuccess = () => resolve(updated);
     req.onerror = () => reject(req.error);
   });
 }
 
-export async function getItemById(id) {
-  const db = await openDb();
+async function dbDeleteItem(id) {
+  const db = await openDB();
+  const tx = db.transaction(STORE_ITEMS, "readwrite");
+  const store = tx.objectStore(STORE_ITEMS);
   return new Promise((resolve, reject) => {
-    const tx = db.transaction([STORE_ITEMS], "readonly");
-    const req = tx.objectStore(STORE_ITEMS).get(id);
-    req.onsuccess = () => resolve(req.result || null);
+    const reqGet = store.get(id);
+    reqGet.onsuccess = () => {
+      const existing = reqGet.result;
+      const reqDel = store.delete(id);
+      reqDel.onsuccess = () => resolve(existing || null);
+      reqDel.onerror = () => reject(reqDel.error);
+    };
+    reqGet.onerror = () => reject(reqGet.error);
+  });
+}
+
+async function dbGetAllItems() {
+  const db = await openDB();
+  const tx = db.transaction(STORE_ITEMS, "readonly");
+  const store = tx.objectStore(STORE_ITEMS);
+  return new Promise((resolve, reject) => {
+    const req = store.getAll();
+    req.onsuccess = () => {
+      const items = req.result || [];
+      items.sort((a, b) => b.createdAt - a.createdAt);
+      resolve(items);
+    };
     req.onerror = () => reject(req.error);
   });
 }
 
-/* Meta storage (for backup etc.) */
-
-export async function setMeta(key, value) {
-  const db = await openDb();
+async function dbDeleteAllItems() {
+  const db = await openDB();
+  const tx = db.transaction(STORE_ITEMS, "readwrite");
+  const store = tx.objectStore(STORE_ITEMS);
   return new Promise((resolve, reject) => {
-    const tx = db.transaction([STORE_META], "readwrite");
-    tx.objectStore(STORE_META).put({ key, value });
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-}
-
-export async function getMeta(key) {
-  const db = await openDb();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction([STORE_META], "readonly");
-    const req = tx.objectStore(STORE_META).get(key);
-    req.onsuccess = () =>
-      resolve(req.result ? req.result.value : undefined);
+    const req = store.clear();
+    req.onsuccess = () => resolve();
     req.onerror = () => reject(req.error);
   });
 }
 
-/* SHA-256 and checksum */
-
-export async function sha256(data) {
-  const enc = new TextEncoder();
-  const bytes = enc.encode(data);
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
-  const arr = Array.from(new Uint8Array(digest));
-  return arr.map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-/* Export: whole DB or items */
-
-export async function exportAllToJson() {
-  const items = await getAllItems();
+// EXPORTS
+async function dbExportAll() {
+  const items = await dbGetAllItems();
   const payload = {
-    type: "catalog-export",
     version: 1,
-    exportedAt: new Date().toISOString(),
+    type: "catalog_export",
+    exportedAt: Date.now(),
     items,
   };
-  const json = JSON.stringify(payload);
-  const checksum = await sha256(json);
+  const serialized = JSON.stringify(payload);
+  const checksum = await sha256(serialized);
   return {
-    ...payload,
+    payload,
+    serialized,
     checksum,
+    wrapper: {
+      fileType: "catalog_export_v1",
+      checksum,
+      payload,
+    },
   };
 }
 
-export async function exportItemsSubset(items) {
+async function dbExportItemsByIds(ids) {
+  const all = await dbGetAllItems();
+  const items = all.filter((i) => ids.includes(i.id));
   const payload = {
-    type: "catalog-export",
     version: 1,
-    exportedAt: new Date().toISOString(),
+    type: "catalog_items_export",
+    exportedAt: Date.now(),
     items,
   };
-  const json = JSON.stringify(payload);
-  const checksum = await sha256(json);
+  const serialized = JSON.stringify(payload);
+  const checksum = await sha256(serialized);
   return {
-    ...payload,
+    payload,
+    serialized,
     checksum,
+    wrapper: {
+      fileType: "catalog_items_export_v1",
+      checksum,
+      payload,
+    },
   };
 }
 
-export async function exportSingleItem(id) {
-  const item = await getItemById(id);
+async function dbExportSingleItem(id) {
+  const db = await openDB();
+  const tx = db.transaction(STORE_ITEMS, "readonly");
+  const store = tx.objectStore(STORE_ITEMS);
+  const item = await new Promise((resolve, reject) => {
+    const req = store.get(id);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
   if (!item) throw new Error("Item not found");
   const payload = {
-    type: "catalog-item-export",
     version: 1,
-    exportedAt: new Date().toISOString(),
+    type: "catalog_single_item",
+    exportedAt: Date.now(),
     item,
   };
-  const json = JSON.stringify(payload);
-  const checksum = await sha256(json);
+  const serialized = JSON.stringify(payload);
+  const checksum = await sha256(serialized);
   return {
-    ...payload,
+    payload,
+    serialized,
     checksum,
+    wrapper: {
+      fileType: "catalog_single_item_v1",
+      checksum,
+      payload,
+    },
   };
 }
 
-/* Download helper (JSON) */
-
-export function triggerDownloadJson(filename, obj) {
-  const blob = new Blob([JSON.stringify(obj, null, 2)], {
-    type: "application/json",
-  });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
-
-/* Duplicate detection */
-
-export function isDuplicate(existingItem, newItem) {
-  if (!existingItem || !newItem) return false;
-  const sameName =
-    existingItem.name.trim().toLowerCase() ===
-    newItem.name.trim().toLowerCase();
-  const sameLocation =
-    existingItem.location.trim().toLowerCase() ===
-    newItem.location.trim().toLowerCase();
-  const sameChecksum = existingItem.checksum === newItem.checksum;
-  return sameName && sameLocation && sameChecksum;
-}
-
-/* Import with tamper detection and conflict handling */
-
-export async function validateAndParseImport(fileContent) {
+// IMPORT & TAMPER DETECTION
+async function dbImportFromJson(
+  jsonText,
+  {
+    mode, // "merge" | "replace" | "select"
+    selectedIds = null,
+    onConflict, // async (existing, incoming) => "keep_existing" | "keep_imported" | "skip"
+  }
+) {
+  const errors = [];
   let parsed;
   try {
-    parsed = JSON.parse(fileContent);
-  } catch (err) {
-    return {
-      ok: false,
-      error: "Invalid JSON",
-      tampered: true,
-      items: [],
-    };
+    parsed = JSON.parse(jsonText);
+  } catch (e) {
+    throw new Error("Invalid JSON file");
   }
 
-  // Basic structure checks
-  if (
-    !parsed ||
-    typeof parsed !== "object" ||
-    !Array.isArray(parsed.items) ||
-    !parsed.checksum
-  ) {
-    return {
-      ok: false,
-      error: "Missing fields",
-      tampered: true,
-      items: [],
-    };
+  if (!parsed || typeof parsed !== "object") {
+    throw new Error("Invalid export structure");
+  }
+  if (!parsed.payload || !parsed.checksum) {
+    throw new Error("Missing wrapper or checksum");
   }
 
-  const originalChecksum = parsed.checksum;
-  const clone = { ...parsed };
-  delete clone.checksum;
-  const jsonWithoutChecksum = JSON.stringify(clone);
-  const computed = await sha256(jsonWithoutChecksum);
+  const payloadString = JSON.stringify(parsed.payload);
+  const actualChecksum = await sha256(payloadString);
+  if (actualChecksum !== parsed.checksum) {
+    throw new Error("File appears tampered or corrupted (checksum mismatch)");
+  }
 
-  const tampered = computed !== originalChecksum;
+  const { payload } = parsed;
 
-  // Validate each item structure
-  const invalidItems = [];
+  if (!payload.items || !Array.isArray(payload.items)) {
+    throw new Error("No items array in payload");
+  }
+
+  // Basic per-item validation & tamper check for each
   const validItems = [];
-  for (const item of parsed.items) {
+  for (const item of payload.items) {
     if (
       !item.id ||
       !item.name ||
       !item.location ||
-      !item.image ||
+      !item.imageDataUrl ||
       !item.checksum
     ) {
-      invalidItems.push(item);
-    } else {
-      validItems.push(item);
+      errors.push({
+        id: item.id || "(unknown)",
+        error: "Missing required fields",
+      });
+      continue;
     }
+    const itemPayload = JSON.stringify({
+      name: item.name,
+      location: item.location,
+      imageDataUrl: item.imageDataUrl,
+    });
+    const computed = await sha256(itemPayload);
+    if (computed !== item.checksum) {
+      errors.push({
+        id: item.id,
+        error: "Item checksum mismatch (tampered item)",
+      });
+      continue;
+    }
+    validItems.push(item);
   }
 
-  return {
-    ok: true,
-    tampered,
-    invalidItems,
-    items: validItems,
-  };
-}
+  const db = await openDB();
+  const tx = db.transaction(STORE_ITEMS, "readwrite");
+  const store = tx.objectStore(STORE_ITEMS);
 
-/**
- * Import items.
- * mode: "merge" | "replace" | "select"
- * selectedIds: array of item ids to import (used if mode === "select")
- * conflictHandler: async callback(existingItem, newItem) => "keep-existing" | "keep-imported" | "skip"
- */
-export async function importItems({
-  items,
-  mode = "merge",
-  selectedIds = null,
-  conflictHandler,
-}) {
-  const allExisting = await getAllItems();
-  const existingByKey = new Map();
-  for (const it of allExisting) {
-    const key = `${it.name.trim().toLowerCase()}|${it.location
-      .trim()
-      .toLowerCase()}|${it.checksum}`;
-    existingByKey.set(key, it);
+  let existingItems = await new Promise((resolve, reject) => {
+    const req = store.getAll();
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = () => reject(req.error);
+  });
+
+  if (mode === "replace") {
+    await new Promise((resolve, reject) => {
+      const reqClear = store.clear();
+      reqClear.onsuccess = () => resolve();
+      reqClear.onerror = () => reject(reqClear.error);
+    });
+    existingItems = [];
   }
+
+  const importedItems =
+    mode === "select" && Array.isArray(selectedIds)
+      ? validItems.filter((i) => selectedIds.includes(i.id))
+      : validItems;
 
   let importedCount = 0;
   let skippedCount = 0;
   let replacedCount = 0;
 
-  const selectedSet =
-    mode === "select" && Array.isArray(selectedIds)
-      ? new Set(selectedIds)
-      : null;
+  for (const item of importedItems) {
+    const duplicate = existingItems.find(
+      (e) =>
+        e.name.toLowerCase() === item.name.toLowerCase() &&
+        e.location.toLowerCase() === item.location.toLowerCase() &&
+        e.checksum === item.checksum
+    );
 
-  const db = await openDb();
-  const tx = db.transaction([STORE_ITEMS], "readwrite");
-  const store = tx.objectStore(STORE_ITEMS);
-
-  for (const newItem of items) {
-    if (selectedSet && !selectedSet.has(newItem.id)) {
-      skippedCount++;
-      continue;
-    }
-
-    const key = `${newItem.name.trim().toLowerCase()}|${newItem.location
-      .trim()
-      .toLowerCase()}|${newItem.checksum}`;
-    const existing = existingByKey.get(key);
-
-    if (mode === "replace") {
-      // Always overwrite items with same key
-      if (existing) {
+    if (duplicate) {
+      const resolution = await onConflict(duplicate, item);
+      if (resolution === "skip") {
+        skippedCount++;
+        continue;
+      }
+      if (resolution === "keep_existing") {
+        skippedCount++;
+        continue;
+      }
+      if (resolution === "keep_imported") {
+        // Replace existing
+        item.id = duplicate.id;
         await new Promise((resolve, reject) => {
-          store.put(newItem).onsuccess = () => resolve();
-          store.put(newItem).onerror = () => reject();
+          const req = store.put(item);
+          req.onsuccess = () => resolve();
+          req.onerror = () => reject(req.error);
         });
         replacedCount++;
-      } else {
-        await new Promise((resolve, reject) => {
-          store.add(newItem).onsuccess = () => resolve();
-          store.add(newItem).onerror = () => reject();
-        });
-        importedCount++;
+        continue;
       }
-      continue;
-    }
-
-    if (!existing) {
+    } else {
+      // New item, ensure id uniqueness
+      if (!item.id) item.id = crypto.randomUUID();
       await new Promise((resolve, reject) => {
-        store.add(newItem).onsuccess = () => resolve();
-        store.add(newItem).onerror = () => reject();
+        const req = store.put(item);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
       });
       importedCount++;
-      continue;
-    }
-
-    // Duplicate found
-    if (!conflictHandler) {
-      skippedCount++;
-      continue;
-    }
-
-    const decision = await conflictHandler(existing, newItem);
-    if (decision === "keep-existing") {
-      skippedCount++;
-    } else if (decision === "keep-imported") {
-      await new Promise((resolve, reject) => {
-        store.put(newItem).onsuccess = () => resolve();
-        store.put(newItem).onerror = () => reject();
-      });
-      replacedCount++;
-    } else {
-      skippedCount++;
     }
   }
 
   return {
-    imported: importedCount,
-    skipped: skippedCount,
-    replaced: replacedCount,
+    importedCount,
+    skippedCount,
+    replacedCount,
+    errorItems: errors,
   };
 }
+
+// BACKUPS
+async function dbCreateBackup() {
+  const { wrapper } = await dbExportAll();
+  const db = await openDB();
+  const tx = db.transaction(STORE_BACKUPS, "readwrite");
+  const store = tx.objectStore(STORE_BACKUPS);
+  return new Promise((resolve, reject) => {
+    const record = {
+      createdAt: Date.now(),
+      data: wrapper,
+    };
+    const req = store.add(record);
+    req.onsuccess = () => resolve(record);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function dbGetBackups() {
+  const db = await openDB();
+  const tx = db.transaction(STORE_BACKUPS, "readonly");
+  const store = tx.objectStore(STORE_BACKUPS);
+  return new Promise((resolve, reject) => {
+    const req = store.getAll();
+    req.onsuccess = () => {
+      const backups = req.result || [];
+      backups.sort((a, b) => a.createdAt - b.createdAt);
+      resolve(backups);
+    };
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function dbPruneBackups(keepMax = 5) {
+  const backups = await dbGetBackups();
+  if (backups.length <= keepMax) return;
+  const db = await openDB();
+  const tx = db.transaction(STORE_BACKUPS, "readwrite");
+  const store = tx.objectStore(STORE_BACKUPS);
+  const toDelete = backups.slice(0, backups.length - keepMax);
+  await Promise.all(
+    toDelete.map(
+      (b) =>
+        new Promise((resolve, reject) => {
+          const req = store.delete(b.createdAt);
+          req.onsuccess = () => resolve();
+          req.onerror = () => reject(req.error);
+        })
+    )
+  );
+}
+
+window.CatalogDB = {
+  fileToDataURL,
+  sha256,
+  addItem: dbAddItem,
+  updateItem: dbUpdateItem,
+  deleteItem: dbDeleteItem,
+  deleteAll: dbDeleteAllItems,
+  getAll: dbGetAllItems,
+  exportAll: dbExportAll,
+  exportItemsByIds: dbExportItemsByIds,
+  exportSingle: dbExportSingleItem,
+  importFromJson: dbImportFromJson,
+  createBackup: dbCreateBackup,
+  getBackups: dbGetBackups,
+  pruneBackups: dbPruneBackups,
+};
