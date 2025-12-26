@@ -1,359 +1,368 @@
 // db.js
-// IndexedDB wrapper and data logic
+// IndexedDB logic, import/export, duplicate detection, SHA-256, tamper detection
 
-const DB_NAME = 'catalog-db';
+const DB_NAME = "catalog-db-v1";
 const DB_VERSION = 1;
-const STORE_ITEMS = 'items';
-const STORE_META = 'meta';
-
-// Key for backup metadata in meta store
-const META_KEY_BACKUP = 'backupInfo';
+const STORE_ITEMS = "items";
+const STORE_META = "meta";
 
 let dbPromise = null;
 
 function openDb() {
   if (dbPromise) return dbPromise;
-
   dbPromise = new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
-
-    req.onupgradeneeded = event => {
-      const db = event.target.result;
-
+    req.onupgradeneeded = (e) => {
+      const db = e.target.result;
       if (!db.objectStoreNames.contains(STORE_ITEMS)) {
-        const store = db.createObjectStore(STORE_ITEMS, { keyPath: 'id' });
-        store.createIndex('by_name', 'name', { unique: false });
-        store.createIndex('by_location', 'location', { unique: false });
-        store.createIndex('by_favorite', 'favorite', { unique: false });
+        const store = db.createObjectStore(STORE_ITEMS, { keyPath: "id" });
+        store.createIndex("by_name", "name", { unique: false });
+        store.createIndex("by_location", "location", { unique: false });
+        store.createIndex("by_favorite", "favorite", { unique: false });
       }
-
       if (!db.objectStoreNames.contains(STORE_META)) {
-        db.createObjectStore(STORE_META, { keyPath: 'key' });
+        db.createObjectStore(STORE_META, { keyPath: "key" });
       }
     };
-
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
   });
-
   return dbPromise;
 }
 
-// Helpers
-async function tx(storeName, mode, fn) {
+/* Basic CRUD */
+
+export async function addItem(item) {
   const db = await openDb();
   return new Promise((resolve, reject) => {
-    const transaction = db.transaction(storeName, mode);
-    const store = transaction.objectStore(storeName);
-    const result = fn(store);
-    transaction.oncomplete = () => resolve(result);
-    transaction.onerror = () => reject(transaction.error);
+    const tx = db.transaction([STORE_ITEMS], "readwrite");
+    tx.objectStore(STORE_ITEMS).add(item);
+    tx.oncomplete = () => resolve(item);
+    tx.onerror = () => reject(tx.error);
   });
 }
 
-// Crypto hash (SHA-256)
-async function sha256Base64(input) {
+export async function updateItem(item) {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([STORE_ITEMS], "readwrite");
+    tx.objectStore(STORE_ITEMS).put(item);
+    tx.oncomplete = () => resolve(item);
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+export async function deleteItem(id) {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([STORE_ITEMS], "readwrite");
+    tx.objectStore(STORE_ITEMS).delete(id);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+export async function clearAllItems() {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([STORE_ITEMS], "readwrite");
+    tx.objectStore(STORE_ITEMS).clear();
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+export async function getAllItems() {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([STORE_ITEMS], "readonly");
+    const req = tx.objectStore(STORE_ITEMS).getAll();
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function getItemById(id) {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([STORE_ITEMS], "readonly");
+    const req = tx.objectStore(STORE_ITEMS).get(id);
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+/* Meta storage (for backup etc.) */
+
+export async function setMeta(key, value) {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([STORE_META], "readwrite");
+    tx.objectStore(STORE_META).put({ key, value });
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+export async function getMeta(key) {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([STORE_META], "readonly");
+    const req = tx.objectStore(STORE_META).get(key);
+    req.onsuccess = () =>
+      resolve(req.result ? req.result.value : undefined);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+/* SHA-256 and checksum */
+
+export async function sha256(data) {
   const enc = new TextEncoder();
-  const data = enc.encode(input);
-  const digest = await crypto.subtle.digest('SHA-256', data);
-  const bytes = new Uint8Array(digest);
-  let binary = '';
-  for (let b of bytes) binary += String.fromCharCode(b);
-  return btoa(binary);
+  const bytes = enc.encode(data);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  const arr = Array.from(new Uint8Array(digest));
+  return arr.map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-// Image to hash (for duplicate detection)
-async function hashImageFile(file) {
-  return sha256Base64(`${file.name}-${file.size}-${file.lastModified}`);
-}
+/* Export: whole DB or items */
 
-// Item schema:
-// {
-//   id: string (crypto.randomUUID())
-//   name: string
-//   location: string
-//   imageDataUrl: string
-//   checksum: string (SHA-256 of name+location+imageDataUrl or file info)
-//   favorite: boolean
-//   createdAt: number (timestamp)
-//   updatedAt: number (timestamp)
-// }
-
-async function addItem({ name, location, imageDataUrl }) {
-  const id = crypto.randomUUID();
-  const checksum = await sha256Base64(`${name.toLowerCase()}|${location.toLowerCase()}|${imageDataUrl}`);
-  const now = Date.now();
-
-  const item = {
-    id,
-    name,
-    location,
-    imageDataUrl,
-    checksum,
-    favorite: false,
-    createdAt: now,
-    updatedAt: now
-  };
-
-  await tx(STORE_ITEMS, 'readwrite', store => store.add(item));
-  return item;
-}
-
-async function updateItem(item) {
-  item.updatedAt = Date.now();
-  await tx(STORE_ITEMS, 'readwrite', store => store.put(item));
-  return item;
-}
-
-async function deleteItem(id) {
-  await tx(STORE_ITEMS, 'readwrite', store => store.delete(id));
-}
-
-async function deleteAllItems() {
-  await tx(STORE_ITEMS, 'readwrite', store => store.clear());
-}
-
-async function getAllItems() {
-  return tx(STORE_ITEMS, 'readonly', store => {
-    return new Promise(resolve => {
-      const items = [];
-      const req = store.openCursor();
-      req.onsuccess = () => {
-        const cursor = req.result;
-        if (cursor) {
-          items.push(cursor.value);
-          cursor.continue();
-        } else {
-          resolve(
-            items.sort((a, b) => b.createdAt - a.createdAt)
-          );
-        }
-      };
-    });
-  });
-}
-
-async function toggleFavorite(id, favorite) {
-  const db = await openDb();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(STORE_ITEMS, 'readwrite');
-    const store = transaction.objectStore(STORE_ITEMS);
-    const req = store.get(id);
-    req.onsuccess = () => {
-      const item = req.result;
-      if (!item) return resolve(null);
-      item.favorite = favorite;
-      item.updatedAt = Date.now();
-      store.put(item);
-      resolve(item);
-    };
-    req.onerror = () => reject(req.error);
-  });
-}
-
-// Export
-async function exportAllItems() {
+export async function exportAllToJson() {
   const items = await getAllItems();
-  return {
+  const payload = {
+    type: "catalog-export",
     version: 1,
-    exportedAt: Date.now(),
-    items
+    exportedAt: new Date().toISOString(),
+    items,
+  };
+  const json = JSON.stringify(payload);
+  const checksum = await sha256(json);
+  return {
+    ...payload,
+    checksum,
   };
 }
 
-async function exportSingleItem(id) {
-  const db = await openDb();
-  return new Promise((resolve, reject) => {
-    const txObj = db.transaction(STORE_ITEMS, 'readonly');
-    const store = txObj.objectStore(STORE_ITEMS);
-    const req = store.get(id);
-    req.onsuccess = () => {
-      if (!req.result) return resolve(null);
-      resolve({
-        version: 1,
-        exportedAt: Date.now(),
-        items: [req.result]
-      });
-    };
-    req.onerror = () => reject(req.error);
+export async function exportItemsSubset(items) {
+  const payload = {
+    type: "catalog-export",
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    items,
+  };
+  const json = JSON.stringify(payload);
+  const checksum = await sha256(json);
+  return {
+    ...payload,
+    checksum,
+  };
+}
+
+export async function exportSingleItem(id) {
+  const item = await getItemById(id);
+  if (!item) throw new Error("Item not found");
+  const payload = {
+    type: "catalog-item-export",
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    item,
+  };
+  const json = JSON.stringify(payload);
+  const checksum = await sha256(json);
+  return {
+    ...payload,
+    checksum,
+  };
+}
+
+/* Download helper (JSON) */
+
+export function triggerDownloadJson(filename, obj) {
+  const blob = new Blob([JSON.stringify(obj, null, 2)], {
+    type: "application/json",
   });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
-// Import + duplicate detection + tamper checks
-function isDuplicate(existing, candidate) {
-  if (!existing || !candidate) return false;
-  return (
-    (existing.name || '').toLowerCase() === (candidate.name || '').toLowerCase() &&
-    (existing.location || '').toLowerCase() === (candidate.location || '').toLowerCase() &&
-    existing.checksum === candidate.checksum
-  );
+/* Duplicate detection */
+
+export function isDuplicate(existingItem, newItem) {
+  if (!existingItem || !newItem) return false;
+  const sameName =
+    existingItem.name.trim().toLowerCase() ===
+    newItem.name.trim().toLowerCase();
+  const sameLocation =
+    existingItem.location.trim().toLowerCase() ===
+    newItem.location.trim().toLowerCase();
+  const sameChecksum = existingItem.checksum === newItem.checksum;
+  return sameName && sameLocation && sameChecksum;
 }
 
-async function importItemsFromJson(parsed, {
-  mode = 'merge', // 'merge' | 'replace' | 'select'
-  selectedIds = null,
-  conflictResolver = null // async (existing, incoming) => 'keepExisting' | 'keepImported' | 'skip'
-} = {}) {
-  // Tamper detection: basic schema check
-  if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.items)) {
+/* Import with tamper detection and conflict handling */
+
+export async function validateAndParseImport(fileContent) {
+  let parsed;
+  try {
+    parsed = JSON.parse(fileContent);
+  } catch (err) {
     return {
+      ok: false,
+      error: "Invalid JSON",
       tampered: true,
-      tamperedItems: [],
-      imported: 0,
-      skipped: 0,
-      replaced: 0
+      items: [],
     };
   }
 
-  const incomingItems = parsed.items.filter(i =>
-    i && typeof i.id === 'string' && i.checksum
-  );
-
-  const db = await openDb();
-  const results = {
-    tampered: false,
-    tamperedItems: [],
-    imported: 0,
-    skipped: 0,
-    replaced: 0
-  };
-
-  await new Promise((resolve, reject) => {
-    const txDb = db.transaction(STORE_ITEMS, 'readwrite');
-    const store = txDb.objectStore(STORE_ITEMS);
-
-    const existingMap = new Map();
-    store.openCursor().onsuccess = e => {
-      const cursor = e.target.result;
-      if (cursor) {
-        existingMap.set(cursor.value.id, cursor.value);
-        cursor.continue();
-      } else {
-        // Now process imports
-        const toProcess = selectedIds
-          ? incomingItems.filter(i => selectedIds.includes(i.id))
-          : incomingItems;
-
-        const processNext = index => {
-          if (index >= toProcess.length) {
-            return;
-          }
-          const inc = toProcess[index];
-
-          try {
-            // Simple checksum presence as part of tamper detection
-            if (!inc.checksum) {
-              results.tamperedItems.push(inc.id);
-              results.skipped++;
-              return processNext(index + 1);
-            }
-
-            // Duplicate detection
-            const existingById = existingMap.get(inc.id);
-            let conflictTarget = null;
-
-            // Also check duplicates by name/location/checksum
-            let matchedExisting = null;
-            for (const ex of existingMap.values()) {
-              if (isDuplicate(ex, inc)) {
-                matchedExisting = ex;
-                break;
-              }
-            }
-
-            if (existingById || matchedExisting) {
-              conflictTarget = existingById || matchedExisting;
-            }
-
-            if (conflictTarget && conflictResolver) {
-              conflictResolver(conflictTarget, inc).then(choice => {
-                if (choice === 'keepExisting') {
-                  results.skipped++;
-                } else if (choice === 'keepImported') {
-                  store.put(inc);
-                  existingMap.set(inc.id, inc);
-                  results.replaced++;
-                } else {
-                  results.skipped++;
-                }
-                processNext(index + 1);
-              }).catch(() => {
-                results.skipped++;
-                processNext(index + 1);
-              });
-            } else if (conflictTarget) {
-              // Default: skip
-              results.skipped++;
-              processNext(index + 1);
-            } else {
-              // Insert new
-              store.put(inc);
-              existingMap.set(inc.id, inc);
-              results.imported++;
-              processNext(index + 1);
-            }
-          } catch (err) {
-            results.tamperedItems.push(inc.id);
-            results.skipped++;
-            processNext(index + 1);
-          }
-        };
-
-        if (mode === 'replace') {
-          store.clear().onsuccess = () => {
-            existingMap.clear();
-            toProcess.forEach(i => existingMap.set(i.id, i));
-            toProcess.forEach(i => store.put(i));
-            results.imported = toProcess.length;
-            resolve();
-          };
-        } else {
-          processNext(0);
-          resolve();
-        }
-      }
+  // Basic structure checks
+  if (
+    !parsed ||
+    typeof parsed !== "object" ||
+    !Array.isArray(parsed.items) ||
+    !parsed.checksum
+  ) {
+    return {
+      ok: false,
+      error: "Missing fields",
+      tampered: true,
+      items: [],
     };
+  }
 
-    txDb.oncomplete = () => {};
-    txDb.onerror = () => reject(txDb.error);
-  });
+  const originalChecksum = parsed.checksum;
+  const clone = { ...parsed };
+  delete clone.checksum;
+  const jsonWithoutChecksum = JSON.stringify(clone);
+  const computed = await sha256(jsonWithoutChecksum);
 
-  return results;
+  const tampered = computed !== originalChecksum;
+
+  // Validate each item structure
+  const invalidItems = [];
+  const validItems = [];
+  for (const item of parsed.items) {
+    if (
+      !item.id ||
+      !item.name ||
+      !item.location ||
+      !item.image ||
+      !item.checksum
+    ) {
+      invalidItems.push(item);
+    } else {
+      validItems.push(item);
+    }
+  }
+
+  return {
+    ok: true,
+    tampered,
+    invalidItems,
+    items: validItems,
+  };
 }
 
-// Meta: backup info
-async function getBackupInfo() {
+/**
+ * Import items.
+ * mode: "merge" | "replace" | "select"
+ * selectedIds: array of item ids to import (used if mode === "select")
+ * conflictHandler: async callback(existingItem, newItem) => "keep-existing" | "keep-imported" | "skip"
+ */
+export async function importItems({
+  items,
+  mode = "merge",
+  selectedIds = null,
+  conflictHandler,
+}) {
+  const allExisting = await getAllItems();
+  const existingByKey = new Map();
+  for (const it of allExisting) {
+    const key = `${it.name.trim().toLowerCase()}|${it.location
+      .trim()
+      .toLowerCase()}|${it.checksum}`;
+    existingByKey.set(key, it);
+  }
+
+  let importedCount = 0;
+  let skippedCount = 0;
+  let replacedCount = 0;
+
+  const selectedSet =
+    mode === "select" && Array.isArray(selectedIds)
+      ? new Set(selectedIds)
+      : null;
+
   const db = await openDb();
-  return new Promise(resolve => {
-    const txObj = db.transaction(STORE_META, 'readonly');
-    const store = txObj.objectStore(STORE_META);
-    const req = store.get(META_KEY_BACKUP);
-    req.onsuccess = () => resolve(req.result || null);
-    req.onerror = () => resolve(null);
-  });
-}
+  const tx = db.transaction([STORE_ITEMS], "readwrite");
+  const store = tx.objectStore(STORE_ITEMS);
 
-async function setBackupInfo(info) {
-  const db = await openDb();
-  return new Promise((resolve, reject) => {
-    const txObj = db.transaction(STORE_META, 'readwrite');
-    const store = txObj.objectStore(STORE_META);
-    store.put({ key: META_KEY_BACKUP, ...info });
-    txObj.oncomplete = () => resolve();
-    txObj.onerror = () => reject(txObj.error);
-  });
-}
+  for (const newItem of items) {
+    if (selectedSet && !selectedSet.has(newItem.id)) {
+      skippedCount++;
+      continue;
+    }
 
-window.CatalogDB = {
-  addItem,
-  updateItem,
-  deleteItem,
-  deleteAllItems,
-  getAllItems,
-  toggleFavorite,
-  exportAllItems,
-  exportSingleItem,
-  importItemsFromJson,
-  getBackupInfo,
-  setBackupInfo
-};
+    const key = `${newItem.name.trim().toLowerCase()}|${newItem.location
+      .trim()
+      .toLowerCase()}|${newItem.checksum}`;
+    const existing = existingByKey.get(key);
+
+    if (mode === "replace") {
+      // Always overwrite items with same key
+      if (existing) {
+        await new Promise((resolve, reject) => {
+          store.put(newItem).onsuccess = () => resolve();
+          store.put(newItem).onerror = () => reject();
+        });
+        replacedCount++;
+      } else {
+        await new Promise((resolve, reject) => {
+          store.add(newItem).onsuccess = () => resolve();
+          store.add(newItem).onerror = () => reject();
+        });
+        importedCount++;
+      }
+      continue;
+    }
+
+    if (!existing) {
+      await new Promise((resolve, reject) => {
+        store.add(newItem).onsuccess = () => resolve();
+        store.add(newItem).onerror = () => reject();
+      });
+      importedCount++;
+      continue;
+    }
+
+    // Duplicate found
+    if (!conflictHandler) {
+      skippedCount++;
+      continue;
+    }
+
+    const decision = await conflictHandler(existing, newItem);
+    if (decision === "keep-existing") {
+      skippedCount++;
+    } else if (decision === "keep-imported") {
+      await new Promise((resolve, reject) => {
+        store.put(newItem).onsuccess = () => resolve();
+        store.put(newItem).onerror = () => reject();
+      });
+      replacedCount++;
+    } else {
+      skippedCount++;
+    }
+  }
+
+  return {
+    imported: importedCount,
+    skipped: skippedCount,
+    replaced: replacedCount,
+  };
+}
