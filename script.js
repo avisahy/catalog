@@ -1,4 +1,4 @@
-// Main UI logic, animations, QR, sharing, voice search, swipe, backup
+// Main UI logic, animations, QR, sharing, voice search, swipe, backup.
 
 const appState = {
   items: [],
