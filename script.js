@@ -1,4 +1,4 @@
-// Main UI logic, animations, QR, sharing, voice search, swipe, backup.
+// Main UI logic, animations, QR, sharing, voice search, swipe, backup
 
 const appState = {
   items: [],
@@ -16,9 +16,12 @@ const appState = {
   lastBackupAt: null,
   backupIntervalDays: 1,
   snackbarTimeout: null,
+  snackbarUndoHandler: null,
 };
 
 const dom = {};
+let currentImportPayload = null; // used by import dialog
+let editModeItemId = null;       // null = add, otherwise edit existing
 
 document.addEventListener("DOMContentLoaded", () => {
   cacheDom();
@@ -70,9 +73,7 @@ function cacheDom() {
 
   dom.previewOverlay = document.getElementById("previewOverlay");
   dom.previewCard = document.getElementById("previewCard");
-  dom.previewImageContainer = document.getElementById(
-    "previewImageContainer"
-  );
+  dom.previewImageContainer = document.getElementById("previewImageContainer");
   dom.previewImage = document.getElementById("previewImage");
   dom.previewName = document.getElementById("previewName");
   dom.previewLocation = document.getElementById("previewLocation");
@@ -80,9 +81,7 @@ function cacheDom() {
   dom.previewFavoriteBtn = document.getElementById("previewFavoriteBtn");
   dom.previewWhatsAppBtn = document.getElementById("previewWhatsAppBtn");
   dom.previewQrBtn = document.getElementById("previewQrBtn");
-  dom.previewShareLinkBtn = document.getElementById(
-    "previewShareLinkBtn"
-  );
+  dom.previewShareLinkBtn = document.getElementById("previewShareLinkBtn");
   dom.previewExportBtn = document.getElementById("previewExportBtn");
   dom.previewDeleteBtn = document.getElementById("previewDeleteBtn");
   dom.previewPrevBtn = document.getElementById("previewPrevBtn");
@@ -110,9 +109,7 @@ function cacheDom() {
 
   dom.importOverlay = document.getElementById("importOverlay");
   dom.importSummaryText = document.getElementById("importSummaryText");
-  dom.importConflictSection = document.getElementById(
-    "importConflictSection"
-  );
+  dom.importConflictSection = document.getElementById("importConflictSection");
   dom.importTamperSection = document.getElementById("importTamperSection");
   dom.tamperMessage = document.getElementById("tamperMessage");
   dom.importSelectSection = document.getElementById("importSelectSection");
@@ -137,12 +134,15 @@ function cacheDom() {
 
 /* events */
 function attachEventHandlers() {
+  // Navigation
   dom.homeLogo.addEventListener("click", () => switchPage("home"));
   dom.settingsNavBtn.addEventListener("click", () => switchPage("settings"));
   dom.statsNavBtn.addEventListener("click", () => switchPage("stats"));
 
+  // FAB
   dom.fabAddItem.addEventListener("click", () => openEditDialog());
 
+  // Search & filters
   dom.searchInput.addEventListener("input", () => {
     applyFilters();
     renderCatalog();
@@ -150,19 +150,24 @@ function attachEventHandlers() {
 
   dom.favoriteFilterBtn.addEventListener("click", () => {
     appState.favoritesOnly = !appState.favoritesOnly;
-    dom.favoriteFilterBtn.classList.toggle("chip-active", appState.favoritesOnly);
+    dom.favoriteFilterBtn.classList.toggle(
+      "chip-active",
+      appState.favoritesOnly
+    );
     applyFilters();
     renderCatalog();
   });
 
   dom.batchModeBtn.addEventListener("click", toggleBatchMode);
 
+  // Layout + text size
   dom.layoutChips.forEach((chip) =>
     chip.addEventListener("click", () => {
       appState.layoutCols = Number(chip.dataset.cols);
       dom.body.setAttribute("data-cols", chip.dataset.cols);
       dom.layoutChips.forEach((c) => c.classList.remove("chip-active"));
       chip.classList.add("chip-active");
+      savePreferences();
     })
   );
 
@@ -176,6 +181,7 @@ function attachEventHandlers() {
     })
   );
 
+  // Theme
   dom.themeToggle.addEventListener("change", () => {
     appState.mode = dom.themeToggle.checked ? "light" : "dark";
     dom.body.setAttribute("data-mode", appState.mode);
@@ -190,17 +196,20 @@ function attachEventHandlers() {
     })
   );
 
+  // Backup settings
   dom.backupIntervalSelect.addEventListener("change", () => {
     appState.backupIntervalDays = Number(dom.backupIntervalSelect.value);
     savePreferences();
   });
 
+  // Export / Import / Backup / Delete all
   dom.exportAllBtn.addEventListener("click", handleExportAll);
   dom.importBtn.addEventListener("click", () => dom.importFileInput.click());
   dom.importFileInput.addEventListener("change", handleImportFile);
   dom.manualBackupBtn.addEventListener("click", handleManualBackup);
   dom.deleteAllBtn.addEventListener("click", handleDeleteAll);
 
+  // Preview modal
   dom.closePreviewBtn.addEventListener("click", closePreview);
   dom.previewFavoriteBtn.addEventListener("click", togglePreviewFavorite);
   dom.previewWhatsAppBtn.addEventListener("click", sharePreviewWhatsApp);
@@ -210,32 +219,30 @@ function attachEventHandlers() {
   dom.previewShareLinkBtn.addEventListener("click", sharePreviewLink);
   dom.previewExportBtn.addEventListener("click", exportPreviewItem);
   dom.previewDeleteBtn.addEventListener("click", deletePreviewItem);
-  dom.previewPrevBtn.addEventListener("click", () =>
-    navigatePreview(-1)
-  );
-  dom.previewNextBtn.addEventListener("click", () =>
-    navigatePreview(1)
-  );
+  dom.previewPrevBtn.addEventListener("click", () => navigatePreview(-1));
+  dom.previewNextBtn.addEventListener("click", () => navigatePreview(1));
 
-  // Swipe for preview
+  // Swipe and gestures in preview
   initPreviewSwipe();
-
-  // Pinch zoom + double-tap full screen
   initPreviewImageGestures();
 
+  // QR overlay
   dom.closeQrBtn.addEventListener("click", () =>
     dom.qrOverlay.classList.add("hidden")
   );
 
+  // Add/Edit dialog
   dom.editForm.addEventListener("submit", handleEditSubmit);
   dom.editCancelBtn.addEventListener("click", () => closeEditDialog());
 
+  // Batch bar
   dom.batchFavoriteBtn.addEventListener("click", handleBatchFavorite);
   dom.batchShareBtn.addEventListener("click", handleBatchShare);
   dom.batchExportBtn.addEventListener("click", handleBatchExport);
   dom.batchDeleteBtn.addEventListener("click", handleBatchDelete);
   dom.batchCancelBtn.addEventListener("click", () => setBatchMode(false));
 
+  // Import dialog actions
   dom.importMergeBtn.addEventListener("click", () =>
     performImport("merge")
   );
@@ -249,6 +256,7 @@ function attachEventHandlers() {
     dom.importOverlay.classList.add("hidden")
   );
 
+  // Snackbar
   dom.snackbarActionBtn.addEventListener("click", () => {
     if (appState.snackbarUndoHandler) {
       const handler = appState.snackbarUndoHandler;
@@ -258,7 +266,7 @@ function attachEventHandlers() {
     hideSnackbar();
   });
 
-  // Close overlays with ESC
+  // ESC to close overlays
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
       if (!dom.previewOverlay.classList.contains("hidden")) closePreview();
@@ -283,7 +291,9 @@ function initPreferences() {
       appState.textSize = prefs.textSize || "medium";
       appState.lastBackupAt = prefs.lastBackupAt || null;
       appState.backupIntervalDays = prefs.backupIntervalDays || 1;
-    } catch {}
+    } catch {
+      // ignore parse errors
+    }
   }
   dom.body.setAttribute("data-theme", appState.theme);
   dom.body.setAttribute("data-mode", appState.mode);
@@ -336,16 +346,12 @@ function initBackupScheduler() {
     const last = appState.lastBackupAt || 0;
     const daysSince = (now - last) / (1000 * 60 * 60 * 24);
     if (daysSince >= appState.backupIntervalDays) {
-      showSnackbar(
-        "It's time to back up your catalog.",
-        "Backup",
-        () => handleManualBackup()
+      showSnackbar("It's time to back up your catalog.", "Backup", () =>
+        handleManualBackup()
       );
     }
   };
-  // Check once on load
   checkBackup();
-  // Then every hour
   setInterval(checkBackup, 60 * 60 * 1000);
 }
 
@@ -359,6 +365,7 @@ async function loadInitialData() {
   applyFilters();
   renderCatalog();
   updateStats();
+
   dom.skeletonGrid.classList.add("hidden");
 }
 
@@ -489,8 +496,6 @@ function switchPage(page) {
 }
 
 /* edit dialog */
-let editModeItemId = null;
-
 function openEditDialog(item = null) {
   editModeItemId = item ? item.id : null;
   dom.editDialogTitle.textContent = item ? "Edit item" : "Add item";
@@ -528,7 +533,7 @@ async function handleEditSubmit(e) {
     const updated = await window.dbApi.updateItem(editModeItemId, {
       name,
       location,
-      imageData: imageData || existing.imageData,
+      imageData: imageData || (existing ? existing.imageData : ""),
     });
     appState.items = appState.items.map((i) =>
       i.id === updated.id ? updated : i
@@ -555,7 +560,6 @@ function openPreviewByIndex(index) {
   dom.previewImage.src = item.imageData || "";
   dom.previewName.textContent = item.name;
   dom.previewLocation.textContent = item.location;
-
   dom.previewFavoriteBtn.textContent = item.favorite ? "💛" : "⭐";
 
   dom.previewOverlay.classList.remove("hidden");
@@ -563,7 +567,6 @@ function openPreviewByIndex(index) {
 
 function closePreview() {
   dom.previewOverlay.classList.add("hidden");
-  // scroll back to card & highlight
   if (!appState.lastPreviewId) return;
   const card = dom.catalogGrid.querySelector(
     `.card[data-id="${appState.lastPreviewId}"]`
@@ -682,7 +685,6 @@ function initPreviewImageGestures() {
     { passive: true }
   );
 
-  // Double click/tap to "full-screen" (scale up)
   dom.previewImageContainer.addEventListener("dblclick", () => {
     if (scale === 1) {
       scale = 2.5;
@@ -705,9 +707,7 @@ function setBatchMode(on) {
   dom.batchBar.classList.toggle("hidden", !on);
   dom.catalogGrid
     .querySelectorAll(".card")
-    .forEach((card) =>
-      card.classList.toggle("card-batch-mode", on)
-    );
+    .forEach((card) => card.classList.toggle("card-batch-mode", on));
   updateBatchSelectionUI();
 }
 
@@ -906,10 +906,7 @@ async function handleDeleteAll() {
   });
 }
 
-/* import */
-let currentImportPayload = null;
-let currentImportValidation = null;
-
+/* import (no DB writes before user chooses action) */
 async function handleImportFile(e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -921,65 +918,51 @@ async function handleImportFile(e) {
     payload = JSON.parse(text);
   } catch {
     alert("Invalid JSON file.");
+    dom.importFileInput.value = "";
+    return;
+  }
+
+  if (!payload || !Array.isArray(payload.items)) {
+    alert("JSON must contain an 'items' array.");
+    dom.importFileInput.value = "";
     return;
   }
 
   currentImportPayload = payload;
 
-  // Validate WITHOUT modifying the database
-  const validation = await window.dbApi.importItems(payload, "skip", []);
-  
-  // Show dialog
-  showImportDialog(validation);
-
-  dom.importFileInput.value = "";
-}
-
-
-async function validatePayloadWithoutImport(payload) {
-  // reuse db.js validate logic through a small helper
-  return window.dbApi.importItems(payload, "skip", []).then((result) => {
-    // This actually writes (skip) but it's safe because we pass no items with strategy skip
-    return result;
-  });
-}
-
-function showImportDialog(validation) {
-  dom.importOverlay.classList.remove("hidden");
-  const total = (currentImportPayload.items || []).length;
+  const total = payload.items.length;
   dom.importSummaryText.textContent = `File contains ${total} item(s).`;
-  dom.importConflictSection.classList.add("hidden");
+
   dom.importTamperSection.classList.add("hidden");
-  dom.importSelectSection.classList.add("hidden");
+  dom.tamperMessage.textContent = "";
   dom.importSummarySection.classList.add("hidden");
+  dom.importResultText.textContent = "";
 
-  if (validation.errors && validation.errors.length) {
-    dom.importTamperSection.classList.remove("hidden");
-    dom.tamperMessage.textContent = validation.errors.join(" ");
-  }
+  // Build selection list
+  dom.importSelectSection.classList.remove("hidden");
+  dom.importItemsList.innerHTML = "";
+  payload.items.forEach((item, idx) => {
+    const li = document.createElement("li");
+    const label = document.createElement("label");
+    const chk = document.createElement("input");
+    chk.type = "checkbox";
+    chk.checked = true;
+    chk.dataset.index = String(idx);
+    label.appendChild(chk);
+    label.appendChild(
+      document.createTextNode(
+        ` ${item.name || "Unnamed"} – ${item.location || ""}`
+      )
+    );
+    li.appendChild(label);
+    dom.importItemsList.appendChild(li);
+  });
 
-  // show selection list
-  if (Array.isArray(currentImportPayload.items)) {
-    dom.importSelectSection.classList.remove("hidden");
-    dom.importItemsList.innerHTML = "";
-    currentImportPayload.items.forEach((item, idx) => {
-      const li = document.createElement("li");
-      const left = document.createElement("label");
-      const chk = document.createElement("input");
-      chk.type = "checkbox";
-      chk.checked = true;
-      chk.dataset.id = item.id || `idx-${idx}`;
-      left.appendChild(chk);
-      left.appendChild(
-        document.createTextNode(` ${item.name || "Unnamed"} – ${item.location || ""}`)
-      );
-      li.appendChild(left);
-      dom.importItemsList.appendChild(li);
-    });
-  }
-
-  // conflict section (we only show generic options; actual conflict resolution happens later)
+  // conflict strategy section stays visible to choose default behavior
   dom.importConflictSection.classList.remove("hidden");
+
+  dom.importOverlay.classList.remove("hidden");
+  dom.importFileInput.value = "";
 }
 
 async function performImport(mode) {
@@ -993,23 +976,21 @@ async function performImport(mode) {
 
   if (mode === "replaceAll") {
     strategy = "replaceAll";
+  } else if (mode === "merge") {
+    strategy = "keepExisting";
   } else if (mode === "selected") {
-    const checks =
-      dom.importItemsList.querySelectorAll("input[type='checkbox']");
+    const checks = dom.importItemsList.querySelectorAll("input[type='checkbox']");
     selectedIds = [];
     checks.forEach((c, idx) => {
       if (!c.checked) return;
-      const idAttr = c.dataset.id;
       const rawItem = currentImportPayload.items[idx];
-      selectedIds.push(rawItem.id || idAttr);
+      const id = rawItem.id || `import-${idx}`;
+      rawItem.id = id;
+      selectedIds.push(id);
     });
-  } else {
-    strategy = "keepExisting";
   }
 
-  const radios = document.querySelectorAll(
-    "input[name='conflictStrategy']"
-  );
+  const radios = document.querySelectorAll("input[name='conflictStrategy']");
   radios.forEach((r) => {
     if (r.checked) {
       if (r.value === "keepExisting") strategy = "keepExisting";
@@ -1020,19 +1001,31 @@ async function performImport(mode) {
 
   const result = await window.dbApi.importItems(
     currentImportPayload,
-    strategy === "merge" ? "keepExisting" : strategy,
+    strategy,
     selectedIds
   );
+
   appState.items = await window.dbApi.getAllItems();
   applyFilters();
   renderCatalog();
   updateStats();
 
+  // Show tamper/validation errors and summary
+  if (result.errors && result.errors.length) {
+    dom.importTamperSection.classList.remove("hidden");
+    dom.tamperMessage.textContent = result.errors.join(" ");
+  } else {
+    dom.importTamperSection.classList.add("hidden");
+    dom.tamperMessage.textContent = "";
+  }
+
   dom.importSummarySection.classList.remove("hidden");
   dom.importResultText.textContent = `Imported: ${result.imported}, replaced: ${result.replaced}, skipped: ${result.skipped}.`;
+
+  showSnackbar("Import completed.", null, null);
 }
 
-/* QR code generation (multi-item support) */
+/* QR code generation (multi-item support, pseudo QR) */
 function openQrForItems(items) {
   if (!items || !items.length) return;
   const payload = {
@@ -1052,18 +1045,15 @@ function openQrForItems(items) {
   dom.qrOverlay.classList.remove("hidden");
 }
 
-// Minimal QR encoder (version 3, low error correction) using a tiny lib
-// Source: simplified / handwritten minimal implementation for short URLs
-// For full robustness, you can swap in a more complete QR implementation.
+// NOTE: this is a pseudo-QR generator (for demo).
+// For real scannable QR, plug in a proper QR library.
 function drawQr(text) {
   const canvas = dom.qrCanvas;
   const ctx = canvas.getContext("2d");
   const size = canvas.width;
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, size, size);
-  // Very small "pseudo QR": we hash the text and draw pattern blocks.
-  // This is not a standards-compliant QR but will visually look like one.
-  // For real scanning, replace this with a proper QR implementation.
+
   const hash = pseudoHash(text, 1024);
   const cells = 32;
   const cellSize = size / cells;
@@ -1149,7 +1139,7 @@ function initVoiceSearch() {
   };
 }
 
-/* SHA-256 helper for script.js */
+/* SHA-256 helper */
 async function sha256String(str) {
   const enc = new TextEncoder();
   const buf = enc.encode(str);
