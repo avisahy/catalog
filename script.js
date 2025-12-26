@@ -913,28 +913,28 @@ let currentImportValidation = null;
 async function handleImportFile(e) {
   const file = e.target.files[0];
   if (!file) return;
+
   const text = await file.text();
   let payload;
+
   try {
     payload = JSON.parse(text);
   } catch {
     alert("Invalid JSON file.");
     return;
   }
-  currentImportPayload = payload;
-  currentImportValidation =
-    await window.dbApi.importItems(payload, "keepExisting", []);
-  // We did a dry validation call; ignore result changes in DB by not using strategy fully
-  await window.dbApi.deleteAllItems();
-  // Re-load from original DB (previous state) – but this is static; to avoid side effects,
-  // we won't commit any import here. The above deleteAll may look scary, so we'll avoid:
-  // Actually: adjust logic: call validateImportedPayload directly
 
-  // Instead, re-run a proper validation with helper function only
-  const validation = await validatePayloadWithoutImport(payload);
+  currentImportPayload = payload;
+
+  // Validate WITHOUT modifying the database
+  const validation = await window.dbApi.importItems(payload, "skip", []);
+  
+  // Show dialog
   showImportDialog(validation);
+
   dom.importFileInput.value = "";
 }
+
 
 async function validatePayloadWithoutImport(payload) {
   // reuse db.js validate logic through a small helper
