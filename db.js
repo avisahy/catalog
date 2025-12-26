@@ -1,428 +1,315 @@
-// db.js
+// IndexedDB + data logic + import/export + SHA-256 + tamper detection
 
-const DB_NAME = "catalog_db";
+const DB_NAME = "catalog_pwa_db";
 const DB_VERSION = 1;
 const STORE_ITEMS = "items";
 const STORE_BACKUPS = "backups";
 
-// Open DB
-function openDB() {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
+let dbPromise = null;
 
-    request.onupgradeneeded = (event) => {
+function openDb() {
+  if (dbPromise) return dbPromise;
+  dbPromise = new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = (event) => {
       const db = event.target.result;
       if (!db.objectStoreNames.contains(STORE_ITEMS)) {
         const store = db.createObjectStore(STORE_ITEMS, { keyPath: "id" });
+        store.createIndex("name", "name", { unique: false });
+        store.createIndex("location", "location", { unique: false });
         store.createIndex("favorite", "favorite", { unique: false });
         store.createIndex("createdAt", "createdAt", { unique: false });
-        store.createIndex("checksum", "checksum", { unique: false });
       }
       if (!db.objectStoreNames.contains(STORE_BACKUPS)) {
-        db.createObjectStore(STORE_BACKUPS, { keyPath: "createdAt" });
+        db.createObjectStore(STORE_BACKUPS, { keyPath: "id" });
       }
     };
-
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
   });
+  return dbPromise;
 }
 
-// SHA-256 helper
-async function sha256(str) {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(str);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-// Convert image file to data URL
-function fileToDataURL(file) {
+async function tx(storeName, mode, cb) {
+  const db = await openDb();
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
+    const transaction = db.transaction(storeName, mode);
+    const store = transaction.objectStore(storeName);
+    const result = cb(store);
+    transaction.oncomplete = () => resolve(result);
+    transaction.onerror = () => reject(transaction.error);
+    transaction.onabort = () => reject(transaction.error);
   });
 }
 
-// Core item operations
-async function dbAddItem({ name, location, imageDataUrl }) {
-  const db = await openDB();
-  const id = crypto.randomUUID();
-  const payloadForChecksum = JSON.stringify({ name, location, imageDataUrl });
-  const checksum = await sha256(payloadForChecksum);
-  const now = Date.now();
+// Hash utilities
+async function sha256String(str) {
+  const enc = new TextEncoder();
+  const buf = enc.encode(str);
+  const hashBuf = await crypto.subtle.digest("SHA-256", buf);
+  return [...new Uint8Array(hashBuf)]
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
 
+async function calculateItemChecksum(item) {
+  const content = JSON.stringify({
+    name: item.name.trim().toLowerCase(),
+    location: item.location.trim().toLowerCase(),
+    imageData: item.imageData || "",
+  });
+  return sha256String(content);
+}
+
+// Item CRUD
+async function addItem({ name, location, imageData }) {
+  const id = crypto.randomUUID();
+  const createdAt = Date.now();
+  const normalizedName = name.trim();
+  const normalizedLocation = location.trim();
   const item = {
     id,
-    name,
-    location,
-    imageDataUrl,
+    name: normalizedName,
+    location: normalizedLocation,
+    imageData: imageData || "",
     favorite: false,
-    createdAt: now,
-    updatedAt: now,
-    checksum,
+    createdAt,
+    updatedAt: createdAt,
   };
+  item.checksum = await calculateItemChecksum(item);
 
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_ITEMS, "readwrite");
-    const store = tx.objectStore(STORE_ITEMS);
-    store.add(item);
-    tx.oncomplete = () => resolve(item);
-    tx.onerror = () => reject(tx.error);
+  await tx(STORE_ITEMS, "readwrite", (store) => store.add(item));
+  return item;
+}
+
+async function updateItem(id, updates) {
+  const existing = await getItem(id);
+  if (!existing) return null;
+  const updated = { ...existing, ...updates, updatedAt: Date.now() };
+  updated.checksum = await calculateItemChecksum(updated);
+  await tx(STORE_ITEMS, "readwrite", (store) => store.put(updated));
+  return updated;
+}
+
+async function getItem(id) {
+  return tx(STORE_ITEMS, "readonly", (store) => store.get(id));
+}
+
+async function deleteItem(id) {
+  const existing = await getItem(id);
+  await tx(STORE_ITEMS, "readwrite", (store) => store.delete(id));
+  return existing;
+}
+
+async function deleteAllItems() {
+  await tx(STORE_ITEMS, "readwrite", (store) => store.clear());
+}
+
+async function getAllItems() {
+  return tx(STORE_ITEMS, "readonly", (store) => store.getAll());
+}
+
+// Backup store
+async function createBackup(items) {
+  const id = crypto.randomUUID();
+  const createdAt = Date.now();
+  const backup = { id, createdAt, items };
+  await tx(STORE_BACKUPS, "readwrite", (store) => store.add(backup));
+  return backup;
+}
+
+async function getAllBackups() {
+  return tx(STORE_BACKUPS, "readonly", (store) => store.getAll());
+}
+
+async function cleanupBackups(maxCount = 5) {
+  const backups = await getAllBackups();
+  backups.sort((a, b) => a.createdAt - b.createdAt);
+  if (backups.length <= maxCount) return;
+  const toDelete = backups.slice(0, backups.length - maxCount);
+  await tx(STORE_BACKUPS, "readwrite", (store) => {
+    toDelete.forEach((b) => store.delete(b.id));
   });
 }
 
-async function dbUpdateItem(id, updates) {
-  const db = await openDB();
-  const tx = db.transaction(STORE_ITEMS, "readwrite");
-  const store = tx.objectStore(STORE_ITEMS);
-
-  const item = await new Promise((resolve, reject) => {
-    const req = store.get(id);
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-
-  if (!item) return null;
-
-  const updated = { ...item, ...updates, updatedAt: Date.now() };
-  return new Promise((resolve, reject) => {
-    const req = store.put(updated);
-    req.onsuccess = () => resolve(updated);
-    req.onerror = () => reject(req.error);
-  });
-}
-
-async function dbDeleteItem(id) {
-  const db = await openDB();
-  const tx = db.transaction(STORE_ITEMS, "readwrite");
-  const store = tx.objectStore(STORE_ITEMS);
-  return new Promise((resolve, reject) => {
-    const reqGet = store.get(id);
-    reqGet.onsuccess = () => {
-      const existing = reqGet.result;
-      const reqDel = store.delete(id);
-      reqDel.onsuccess = () => resolve(existing || null);
-      reqDel.onerror = () => reject(reqDel.error);
-    };
-    reqGet.onerror = () => reject(reqGet.error);
-  });
-}
-
-async function dbGetAllItems() {
-  const db = await openDB();
-  const tx = db.transaction(STORE_ITEMS, "readonly");
-  const store = tx.objectStore(STORE_ITEMS);
-  return new Promise((resolve, reject) => {
-    const req = store.getAll();
-    req.onsuccess = () => {
-      const items = req.result || [];
-      items.sort((a, b) => b.createdAt - a.createdAt);
-      resolve(items);
-    };
-    req.onerror = () => reject(req.error);
-  });
-}
-
-async function dbDeleteAllItems() {
-  const db = await openDB();
-  const tx = db.transaction(STORE_ITEMS, "readwrite");
-  const store = tx.objectStore(STORE_ITEMS);
-  return new Promise((resolve, reject) => {
-    const req = store.clear();
-    req.onsuccess = () => resolve();
-    req.onerror = () => reject(req.error);
-  });
-}
-
-// EXPORTS
-async function dbExportAll() {
-  const items = await dbGetAllItems();
+// Export
+async function exportAllItems() {
+  const items = await getAllItems();
+  // ensure checksum is valid
+  for (const item of items) {
+    if (!item.checksum) {
+      item.checksum = await calculateItemChecksum(item);
+      await tx(STORE_ITEMS, "readwrite", (store) => store.put(item));
+    }
+  }
   const payload = {
-    version: 1,
     type: "catalog_export",
-    exportedAt: Date.now(),
+    version: 1,
+    createdAt: new Date().toISOString(),
     items,
   };
-  const serialized = JSON.stringify(payload);
-  const checksum = await sha256(serialized);
-  return {
-    payload,
-    serialized,
-    checksum,
-    wrapper: {
-      fileType: "catalog_export_v1",
-      checksum,
-      payload,
-    },
-  };
+  payload.metaChecksum = await sha256String(JSON.stringify(items));
+  return payload;
 }
 
-async function dbExportItemsByIds(ids) {
-  const all = await dbGetAllItems();
-  const items = all.filter((i) => ids.includes(i.id));
-  const payload = {
-    version: 1,
-    type: "catalog_items_export",
-    exportedAt: Date.now(),
-    items,
-  };
-  const serialized = JSON.stringify(payload);
-  const checksum = await sha256(serialized);
-  return {
-    payload,
-    serialized,
-    checksum,
-    wrapper: {
-      fileType: "catalog_items_export_v1",
-      checksum,
-      payload,
-    },
-  };
-}
-
-async function dbExportSingleItem(id) {
-  const db = await openDB();
-  const tx = db.transaction(STORE_ITEMS, "readonly");
-  const store = tx.objectStore(STORE_ITEMS);
-  const item = await new Promise((resolve, reject) => {
-    const req = store.get(id);
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-  if (!item) throw new Error("Item not found");
-  const payload = {
-    version: 1,
-    type: "catalog_single_item",
-    exportedAt: Date.now(),
-    item,
-  };
-  const serialized = JSON.stringify(payload);
-  const checksum = await sha256(serialized);
-  return {
-    payload,
-    serialized,
-    checksum,
-    wrapper: {
-      fileType: "catalog_single_item_v1",
-      checksum,
-      payload,
-    },
-  };
-}
-
-// IMPORT & TAMPER DETECTION
-async function dbImportFromJson(
-  jsonText,
-  {
-    mode, // "merge" | "replace" | "select"
-    selectedIds = null,
-    onConflict, // async (existing, incoming) => "keep_existing" | "keep_imported" | "skip"
+async function exportSingleItem(id) {
+  const item = await getItem(id);
+  if (!item) return null;
+  if (!item.checksum) {
+    item.checksum = await calculateItemChecksum(item);
+    await tx(STORE_ITEMS, "readwrite", (store) => store.put(item));
   }
-) {
+  const payload = {
+    type: "catalog_item_export",
+    version: 1,
+    createdAt: new Date().toISOString(),
+    items: [item],
+  };
+  payload.metaChecksum = await sha256String(JSON.stringify(payload.items));
+  return payload;
+}
+
+// Import + duplicate detection + tamper detection
+function isDuplicate(existing, candidate) {
+  if (!existing || !candidate) return false;
+  const sameName =
+    existing.name.trim().toLowerCase() ===
+    candidate.name.trim().toLowerCase();
+  const sameLocation =
+    existing.location.trim().toLowerCase() ===
+    candidate.location.trim().toLowerCase();
+  const sameChecksum = existing.checksum === candidate.checksum;
+  return sameName && sameLocation && !!existing.checksum && sameChecksum;
+}
+
+async function validateImportedPayload(payload) {
   const errors = [];
-  let parsed;
-  try {
-    parsed = JSON.parse(jsonText);
-  } catch (e) {
-    throw new Error("Invalid JSON file");
+  if (!payload || typeof payload !== "object") {
+    errors.push("Invalid JSON structure.");
+    return { valid: false, errors, items: [] };
+  }
+  if (!Array.isArray(payload.items)) {
+    errors.push("Missing items array.");
+    return { valid: false, errors, items: [] };
+  }
+  const recomputedMeta = await sha256String(
+    JSON.stringify(payload.items || [])
+  );
+  if (payload.metaChecksum && payload.metaChecksum !== recomputedMeta) {
+    errors.push("Top-level checksum mismatch – file may be modified.");
   }
 
-  if (!parsed || typeof parsed !== "object") {
-    throw new Error("Invalid export structure");
-  }
-  if (!parsed.payload || !parsed.checksum) {
-    throw new Error("Missing wrapper or checksum");
-  }
-
-  const payloadString = JSON.stringify(parsed.payload);
-  const actualChecksum = await sha256(payloadString);
-  if (actualChecksum !== parsed.checksum) {
-    throw new Error("File appears tampered or corrupted (checksum mismatch)");
-  }
-
-  const { payload } = parsed;
-
-  if (!payload.items || !Array.isArray(payload.items)) {
-    throw new Error("No items array in payload");
-  }
-
-  // Basic per-item validation & tamper check for each
   const validItems = [];
-  for (const item of payload.items) {
-    if (
-      !item.id ||
-      !item.name ||
-      !item.location ||
-      !item.imageDataUrl ||
-      !item.checksum
-    ) {
-      errors.push({
-        id: item.id || "(unknown)",
-        error: "Missing required fields",
+  const invalidItems = [];
+
+  for (const raw of payload.items) {
+    const candidate = { ...raw };
+    if (!candidate.name || !candidate.location) {
+      invalidItems.push({ item: candidate, reason: "Missing name/location." });
+      continue;
+    }
+    const expectedChecksum = await calculateItemChecksum(candidate);
+    if (candidate.checksum && candidate.checksum !== expectedChecksum) {
+      invalidItems.push({
+        item: candidate,
+        reason: "Item checksum mismatch – tampered or corrupted.",
       });
       continue;
     }
-    const itemPayload = JSON.stringify({
-      name: item.name,
-      location: item.location,
-      imageDataUrl: item.imageDataUrl,
-    });
-    const computed = await sha256(itemPayload);
-    if (computed !== item.checksum) {
-      errors.push({
-        id: item.id,
-        error: "Item checksum mismatch (tampered item)",
-      });
-      continue;
-    }
-    validItems.push(item);
+    candidate.id = candidate.id || crypto.randomUUID();
+    candidate.checksum = expectedChecksum;
+    candidate.createdAt = candidate.createdAt || Date.now();
+    candidate.updatedAt = Date.now();
+    validItems.push(candidate);
   }
 
-  const db = await openDB();
-  const tx = db.transaction(STORE_ITEMS, "readwrite");
-  const store = tx.objectStore(STORE_ITEMS);
-
-  let existingItems = await new Promise((resolve, reject) => {
-    const req = store.getAll();
-    req.onsuccess = () => resolve(req.result || []);
-    req.onerror = () => reject(req.error);
-  });
-
-  if (mode === "replace") {
-    await new Promise((resolve, reject) => {
-      const reqClear = store.clear();
-      reqClear.onsuccess = () => resolve();
-      reqClear.onerror = () => reject(reqClear.error);
-    });
-    existingItems = [];
-  }
-
-  const importedItems =
-    mode === "select" && Array.isArray(selectedIds)
-      ? validItems.filter((i) => selectedIds.includes(i.id))
-      : validItems;
-
-  let importedCount = 0;
-  let skippedCount = 0;
-  let replacedCount = 0;
-
-  for (const item of importedItems) {
-    const duplicate = existingItems.find(
-      (e) =>
-        e.name.toLowerCase() === item.name.toLowerCase() &&
-        e.location.toLowerCase() === item.location.toLowerCase() &&
-        e.checksum === item.checksum
-    );
-
-    if (duplicate) {
-      const resolution = await onConflict(duplicate, item);
-      if (resolution === "skip") {
-        skippedCount++;
-        continue;
-      }
-      if (resolution === "keep_existing") {
-        skippedCount++;
-        continue;
-      }
-      if (resolution === "keep_imported") {
-        // Replace existing
-        item.id = duplicate.id;
-        await new Promise((resolve, reject) => {
-          const req = store.put(item);
-          req.onsuccess = () => resolve();
-          req.onerror = () => reject(req.error);
-        });
-        replacedCount++;
-        continue;
-      }
-    } else {
-      // New item, ensure id uniqueness
-      if (!item.id) item.id = crypto.randomUUID();
-      await new Promise((resolve, reject) => {
-        const req = store.put(item);
-        req.onsuccess = () => resolve();
-        req.onerror = () => reject(req.error);
-      });
-      importedCount++;
-    }
+  if (invalidItems.length > 0) {
+    errors.push(`${invalidItems.length} items failed validation.`);
   }
 
   return {
-    importedCount,
-    skippedCount,
-    replacedCount,
-    errorItems: errors,
+    valid: validItems.length > 0,
+    errors,
+    items: validItems,
+    invalidItems,
   };
 }
 
-// BACKUPS
-async function dbCreateBackup() {
-  const { wrapper } = await dbExportAll();
-  const db = await openDB();
-  const tx = db.transaction(STORE_BACKUPS, "readwrite");
-  const store = tx.objectStore(STORE_BACKUPS);
-  return new Promise((resolve, reject) => {
-    const record = {
-      createdAt: Date.now(),
-      data: wrapper,
+async function importItems(payload, strategy, selectedIds = null) {
+  const { valid, errors, items, invalidItems } =
+    await validateImportedPayload(payload);
+  if (!valid && !items.length) {
+    return {
+      imported: 0,
+      skipped: invalidItems.length,
+      replaced: 0,
+      errors,
     };
-    const req = store.add(record);
-    req.onsuccess = () => resolve(record);
-    req.onerror = () => reject(req.error);
+  }
+
+  const existingItems = await getAllItems();
+  const result = {
+    imported: 0,
+    skipped: 0,
+    replaced: 0,
+    errors,
+    invalidItems,
+  };
+
+  const selectedSet =
+    selectedIds && Array.isArray(selectedIds)
+      ? new Set(selectedIds)
+      : null;
+
+  if (strategy === "replaceAll") {
+    await deleteAllItems();
+  }
+
+  await tx(STORE_ITEMS, "readwrite", (store) => {
+    for (const item of items) {
+      if (selectedSet && !selectedSet.has(item.id)) {
+        result.skipped++;
+        continue;
+      }
+
+      const dup = existingItems.find((e) => isDuplicate(e, item));
+      if (!dup) {
+        store.put(item);
+        result.imported++;
+        continue;
+      }
+
+      if (strategy === "keepExisting" || strategy === "skip") {
+        result.skipped++;
+      } else if (strategy === "keepImported") {
+        store.put({ ...item, id: dup.id });
+        result.replaced++;
+      } else if (strategy === "replaceAll") {
+        store.put(item);
+        result.imported++;
+      } else {
+        result.skipped++;
+      }
+    }
   });
+
+  const metaChecksum = await sha256String(JSON.stringify(items));
+  return { ...result, metaChecksum };
 }
 
-async function dbGetBackups() {
-  const db = await openDB();
-  const tx = db.transaction(STORE_BACKUPS, "readonly");
-  const store = tx.objectStore(STORE_BACKUPS);
-  return new Promise((resolve, reject) => {
-    const req = store.getAll();
-    req.onsuccess = () => {
-      const backups = req.result || [];
-      backups.sort((a, b) => a.createdAt - b.createdAt);
-      resolve(backups);
-    };
-    req.onerror = () => reject(req.error);
-  });
-}
-
-async function dbPruneBackups(keepMax = 5) {
-  const backups = await dbGetBackups();
-  if (backups.length <= keepMax) return;
-  const db = await openDB();
-  const tx = db.transaction(STORE_BACKUPS, "readwrite");
-  const store = tx.objectStore(STORE_BACKUPS);
-  const toDelete = backups.slice(0, backups.length - keepMax);
-  await Promise.all(
-    toDelete.map(
-      (b) =>
-        new Promise((resolve, reject) => {
-          const req = store.delete(b.createdAt);
-          req.onsuccess = () => resolve();
-          req.onerror = () => reject(req.error);
-        })
-    )
-  );
-}
-
-window.CatalogDB = {
-  fileToDataURL,
-  sha256,
-  addItem: dbAddItem,
-  updateItem: dbUpdateItem,
-  deleteItem: dbDeleteItem,
-  deleteAll: dbDeleteAllItems,
-  getAll: dbGetAllItems,
-  exportAll: dbExportAll,
-  exportItemsByIds: dbExportItemsByIds,
-  exportSingle: dbExportSingleItem,
-  importFromJson: dbImportFromJson,
-  createBackup: dbCreateBackup,
-  getBackups: dbGetBackups,
-  pruneBackups: dbPruneBackups,
+// Expose to script.js
+window.dbApi = {
+  openDb,
+  addItem,
+  updateItem,
+  getItem,
+  deleteItem,
+  deleteAllItems,
+  getAllItems,
+  createBackup,
+  getAllBackups,
+  cleanupBackups,
+  exportAllItems,
+  exportSingleItem,
+  importItems,
 };
