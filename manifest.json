@@ -1,19 +1,19 @@
 {
-  "name": "Item Catalog PWA",
+  "name": "Catalog PWA",
   "short_name": "Catalog",
-  "start_url": "/catalog/",
-  "scope": "/catalog/",
+  "start_url": "./",
   "display": "standalone",
-  "background_color": "#050816",
-  "theme_color": "#050816",
+  "background_color": "#080910",
+  "theme_color": "#080910",
+  "description": "Offline-capable 3D catalog app with sharing, backups, and PWA support.",
   "icons": [
     {
-      "src": "/catalog/icons/icon-192.png",
+      "src": "icons/icon-192.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "/catalog/icons/icon-512.png",
+      "src": "icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png"
     }
