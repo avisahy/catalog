@@ -30,13 +30,35 @@ function openDb() {
   return dbPromise;
 }
 
+/* ============================================================
+   FIX 1 — Correct transaction helper
+   Resolves with request.result instead of the IDBRequest object
+   ============================================================ */
+
 async function tx(storeName, mode, cb) {
   const db = await openDb();
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(storeName, mode);
     const store = transaction.objectStore(storeName);
-    const result = cb(store);
-    transaction.oncomplete = () => resolve(result);
+
+    let requestResult;
+
+    const request = cb(store);
+
+    // If cb returned an IDBRequest, capture its result
+    if (request && typeof request.addEventListener === "function") {
+      request.onsuccess = () => {
+        requestResult = request.result;
+      };
+      request.onerror = () => {
+        // transaction.onerror will handle rejection
+      };
+    } else {
+      // cb returned a value (e.g., for writes)
+      requestResult = request;
+    }
+
+    transaction.oncomplete = () => resolve(requestResult);
     transaction.onerror = () => reject(transaction.error);
     transaction.onabort = () => reject(transaction.error);
   });
@@ -135,7 +157,6 @@ async function cleanupBackups(maxCount = 5) {
 // Export
 async function exportAllItems() {
   const items = await getAllItems();
-  // ensure checksum is valid
   for (const item of items) {
     if (!item.checksum) {
       item.checksum = await calculateItemChecksum(item);
