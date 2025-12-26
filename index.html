@@ -8,12 +8,7 @@
   <meta name="theme-color" content="#121212" />
   <link rel="icon" href="icons/icon-192.png" type="image/png" />
   <link rel="stylesheet" href="style.css" />
-
-  <!-- Load main script as ES module -->
-  <script type="module" src="script.js"></script>
-
   <script>
-    // Minimal inline check to add dark or light before CSS to reduce FOUC
     (function () {
       const theme = localStorage.getItem('catalog-theme') || 'dark';
       document.documentElement.setAttribute('data-theme', theme);
@@ -64,10 +59,7 @@
           placeholder="Search by name or location"
         />
         <button id="btn-clear-search" class="icon-button" title="Clear search">✖</button>
-
-        <button id="btn-filter-favorites" class="toggle-button" title="Filter favorites">
-          ★
-        </button>
+        <button id="btn-filter-favorites" class="toggle-button" title="Filter favorites">★</button>
       </div>
 
       <div class="batch-toolbar" id="batch-toolbar">
@@ -82,7 +74,6 @@
       </div>
 
       <div id="skeleton-container" class="card-grid skeleton-grid">
-        <!-- Skeleton cards (shown while loading) -->
         <div class="card skeleton-card"></div>
         <div class="card skeleton-card"></div>
         <div class="card skeleton-card"></div>
@@ -91,9 +82,7 @@
         <div class="card skeleton-card"></div>
       </div>
 
-      <div id="card-grid" class="card-grid hidden">
-        <!-- Cards dynamically inserted here -->
-      </div>
+      <div id="card-grid" class="card-grid hidden"></div>
     </section>
 
     <!-- STATS PAGE -->
@@ -168,7 +157,7 @@
     </section>
   </main>
 
-  <!-- FLOATING ACTION BUTTON -->
+  <!-- FAB -->
   <button id="fab-add-item" class="fab" title="Add item">＋</button>
 
   <!-- ADD / EDIT ITEM MODAL -->
@@ -201,7 +190,7 @@
     </div>
   </div>
 
-  <!-- ITEM PREVIEW MODAL -->
+  <!-- PREVIEW MODAL -->
   <div id="modal-preview" class="modal hidden">
     <div class="modal-backdrop"></div>
     <div class="modal-content modal-preview card-3d">
@@ -296,6 +285,7 @@
     <button id="snackbar-action"></button>
   </div>
 
+  <!-- MAIN SCRIPT AS MODULE -->
+  <script type="module" src="./script.js"></script>
 </body>
 </html>
-
