@@ -33,21 +33,14 @@ function openDb() {
   });
 }
 
-/**
- * Compute SHA-256 of a string and return hex
- */
 async function sha256(str) {
   const encoder = new TextEncoder();
   const data = encoder.encode(str);
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hashHex = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
-  return hashHex;
+  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-/**
- * Ensure item has checksum; if not, compute it from relevant fields
- */
 async function ensureChecksum(item) {
   if (item.checksum) return item.checksum;
   const base = (item.name || '') + '|' + (item.location || '') + '|' + (item.imageData || '');
@@ -128,13 +121,8 @@ async function getItem(id) {
   });
 }
 
-/**
- * Export functions
- */
-
 async function exportAllToJson() {
   const items = await getAllItems();
-  // Ensure all checksums exist
   for (const it of items) {
     await ensureChecksum(it);
   }
@@ -190,12 +178,6 @@ async function exportItemsToJson(ids) {
   return JSON.stringify(wrapper, null, 2);
 }
 
-/**
- * Import functions
- *  - Tamper detection via wrapper.meta.checksum
- *  - Duplicate detection via name/location/checksum
- */
-
 async function validateImportJson(text) {
   const errors = [];
   let wrapper;
@@ -224,7 +206,6 @@ async function validateImportJson(text) {
     errors.push('Unexpected wrapper type');
   }
 
-  // Verify checksum
   const dataStr = JSON.stringify(wrapper.data);
   const computed = await sha256(dataStr);
   if (computed !== wrapper.meta.checksum) {
@@ -236,19 +217,16 @@ async function validateImportJson(text) {
     errors.push('No items array found in data');
   }
 
-  const items = (data.items || []).map((raw) => {
-    return {
-      id: raw.id || crypto.randomUUID(),
-      name: raw.name || '',
-      location: raw.location || '',
-      imageData: raw.imageData || '',
-      favorite: !!raw.favorite,
-      createdAt: raw.createdAt || Date.now(),
-      checksum: raw.checksum || null
-    };
-  });
+  const items = (data.items || []).map((raw) => ({
+    id: raw.id || crypto.randomUUID(),
+    name: raw.name || '',
+    location: raw.location || '',
+    imageData: raw.imageData || '',
+    favorite: !!raw.favorite,
+    createdAt: raw.createdAt || Date.now(),
+    checksum: raw.checksum || null
+  }));
 
-  // Validate each item’s checksum
   const invalidItems = [];
   for (const it of items) {
     const base = (it.name || '') + '|' + (it.location || '') + '|' + (it.imageData || '');
@@ -273,9 +251,6 @@ async function validateImportJson(text) {
   };
 }
 
-/**
- * Find duplicates compared to DB
- */
 async function findDuplicates(importItems) {
   const existing = await getAllItems();
   const duplicates = [];
@@ -304,10 +279,6 @@ async function findDuplicates(importItems) {
   return duplicates;
 }
 
-/**
- * Apply import results after conflict resolution
- * strategies: "merge", "replace", or manual per conflict
- */
 async function applyImport(importItems, mode, conflictDecisions) {
   const db = await openDb();
 
@@ -327,12 +298,8 @@ async function applyImport(importItems, mode, conflictDecisions) {
 
       if (mode === 'replace') {
         await clearAllItems();
-        // fresh store
-      } else if (mode === 'merge') {
-        // Just merge, but respect duplicates by skipping
       }
 
-      // Build map of duplicates for conflict resolution
       const dupList = await findDuplicates(importItems);
       const dupMap = new Map();
       dupList.forEach((d) => {
@@ -347,7 +314,6 @@ async function applyImport(importItems, mode, conflictDecisions) {
           continue;
         }
 
-        // conflict decisions by incoming item id: "keep-existing" | "keep-imported" | "skip"
         const decision = conflictDecisions[item.id];
         if (decision === 'skip') {
           result.skipped++;
@@ -360,7 +326,6 @@ async function applyImport(importItems, mode, conflictDecisions) {
           result.replaced++;
           continue;
         } else {
-          // default: keep existing
           result.skipped++;
           continue;
         }
@@ -370,7 +335,6 @@ async function applyImport(importItems, mode, conflictDecisions) {
     tx.oncomplete = () => resolve(result);
     tx.onerror = () => reject(tx.error);
 
-    // Kick off
     process().catch((err) => {
       console.error(err);
       tx.abort();
@@ -379,9 +343,6 @@ async function applyImport(importItems, mode, conflictDecisions) {
   });
 }
 
-/**
- * Simple helper for downloading a blob (used for backups, exports)
- */
 function downloadJsonFile(filename, text) {
   const blob = new Blob([text], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -393,10 +354,6 @@ function downloadJsonFile(filename, text) {
   a.remove();
   URL.revokeObjectURL(url);
 }
-
-/**
- * Backup helpers
- */
 
 const BACKUP_KEY_LAST = 'catalog-last-backup';
 const BACKUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
